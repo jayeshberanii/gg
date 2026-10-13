@@ -122,6 +122,7 @@ const prefixOf = (v: unknown): 'P' | 'EP' => (text(v).trim().toUpperCase() === '
  */
 export const patrika: ScreenDefinition = {
   screen: 'patrika',
+  attachments: true,
   table: 'Patrika',
   primaryColumn: 'PatrikaKm',
   lockable: false,

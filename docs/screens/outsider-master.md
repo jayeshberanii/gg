@@ -65,11 +65,11 @@ Confirm → Security password → plain `DELETE`.
 
 ## Right-click menu
 
-| Item                                           | Behaviour                                                                                                                                                                    |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Print Report › Selected Column / Send To Excel | engine's                                                                                                                                                                     |
-| Send To › Party Master                         | every party the selected visits name (party, attended by, demand approved by, work done by) → opens `party-master`; "No Records Found"                                       |
-| Utility › Show Attachments                     | **desktop only.** `CommonLibrary.frmAttachments` lists files on the desktop computers' drives; the web shows that it needs the desktop (decision 2026-10-05: files deferred) |
+| Item                                           | Behaviour                                                                                                                              |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Print Report › Selected Column / Send To Excel | engine's                                                                                                                               |
+| Send To › Party Master                         | every party the selected visits name (party, attended by, demand approved by, work done by) → opens `party-master`; "No Records Found" |
+| Utility › Show Attachments                     | `CommonLibrary.frmAttachments` → `AttachmentsDialog` (see author-master.md, "Attachments"; ported 2026-10-13)                          |
 
 ## Permissions
 

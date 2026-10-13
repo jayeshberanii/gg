@@ -501,7 +501,10 @@ test('Patrika: New by series, popups, edit, Graphics Detail, Show Attachments, d
   await rightClick(page, 0, 'Pages', ['For Selected Record', 'Graphics Detail']);
   await answer(page, 'No Record Found', 'OK');
   await rightClick(page, 0, 'Pages', ['Utility', 'Show Attachments']);
-  await answer(page, /needs the desktop computers/, 'OK');
+  const attachments = dialog(page, 'Attachments');
+  await expect(attachments.getByRole('columnheader', { name: 'File Name' })).toBeVisible();
+  await attachments.getByRole('button', { name: 'Exit' }).click();
+  await expect(attachments).toBeHidden();
 
   await g.cell(0, 'Pages').click();
   await deleteCurrent(page, win);

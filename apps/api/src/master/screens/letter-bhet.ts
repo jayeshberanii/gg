@@ -33,6 +33,7 @@ const TEXT_LIMITS: [string, string, number][] = [
  */
 export const letterBhet: ScreenDefinition = {
   screen: 'letter-bhet',
+  attachments: true,
   table: 'LetterBhetM',
   primaryColumn: 'LetterBhetMkm',
   lockable: false,

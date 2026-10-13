@@ -1,5 +1,4 @@
 import type { ContextMenuItem } from '@/components/ui/ContextMenu';
-// import { ATTACHMENTS_DESKTOP_ONLY } from '@/features/master/desktopOnly';
 import type { ScreenActions, TransSpec } from '@/features/master/types';
 
 /**
@@ -27,7 +26,7 @@ export const BOOK_TRAN: TransSpec = {
 /**
  * cntMain: Print Report (Selected Column with its saved layouts, Send To Excel, and the form's
  * Crystal report as an HTML print view for the current row), Send To, and Utility › Show
- * Attachments (desktop only).
+ * Attachments.
  */
 export function letterMenu(
   a: ScreenActions,
@@ -77,16 +76,10 @@ export function letterMenu(
           } satisfies ContextMenuItem,
         ]
       : []),
-    // {
-    //   kind: 'submenu',
-    //   label: 'Utility',
-    //   items: [
-    //     {
-    //       kind: 'item',
-    //       label: opts.attachmentsLabel,
-    //       onSelect: () => void a.alert(ATTACHMENTS_DESKTOP_ONLY),
-    //     },
-    //   ],
-    // },
+    {
+      kind: 'submenu',
+      label: 'Utility',
+      items: [{ kind: 'item', label: opts.attachmentsLabel, onSelect: a.showAttachments }],
+    },
   ];
 }

@@ -183,7 +183,7 @@ deleted**. The local DB has 3 orphan Bhet lines (and 7 orphan Demand lines). See
 | Print Report › Send To Excel     | engine's `sendToExcel`                                                                                                                                                                                                                                                                                         |
 | Print Report › Print Bhet Pahoch | `LetterBhetReport.rpt` with parameter `LetterBhetMkm` = **the current row** (only one) → `frmReport` viewer. Web: open the HTML print view (below)                                                                                                                                                             |
 | Send To › Inword Master          | `SELECT ISNULL(STUFF((SELECT DISTINCT ',' + CAST(Inwordkt AS VARCHAR) FROM LetterBhetM WHERE LetterBhetMKm IN(<selected ids>) FOR XML PATH('')),1,1,''),0)` → if not "" or "0", open `inward-master` with those ids, else `"No Record Found"`. Note that `inwordkt = 0` rows put a "0" into the list; harmless |
-| Utility › Show Attachments       | `CommonLibrary.frmAttachments(TranName='LetterBhetM', TranKm)`. **Desktop only** (files deferred): show the `desktopOnly` message                                                                                                                                                                              |
+| Utility › Show Attachments       | `CommonLibrary.frmAttachments(TranName='LetterBhetM', TranKm)`. → `AttachmentsDialog` (see author-master.md, "Attachments")                                                                                                                                                                                    |
 
 ## Reports and printing: `LetterBhetReport.rpt` → HTML print view
 
@@ -299,7 +299,7 @@ The Party and Inword F2s (above), the Send To query, `GetMaxLetterNo`, and
   payload (`actions.printBhetPahoch(ids[0])` → the rows above) as A4 HTML with `@media print`
   CSS, plus `window.print()` so the user can Print or Save as PDF. This screen is the first user
   (plan row 15), and Letter Demand and Issue Slip reuse it.
-- Show Attachments → `desktopOnly`.
+- Show Attachments → `AttachmentsDialog`.
 
 ## Web port (2026-10-07)
 

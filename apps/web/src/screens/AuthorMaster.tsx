@@ -846,15 +846,7 @@ export function AuthorMaster(props: ScreenProps) {
       {
         kind: 'submenu',
         label: 'Utility',
-        items: [
-          item(
-            'Show Attachment',
-            () =>
-              void a.alert(
-                'Attachments are stored on the desktop file share (\\\\192.168.0.210\\Attachments) and cannot be opened from the web app yet.',
-              ),
-          ),
-        ],
+        items: [item('Show Attachment', a.showAttachments)],
       },
     ];
   }

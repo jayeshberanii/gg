@@ -47,6 +47,17 @@ export const envSchema = z.object({
    * the check off ("Temporary Comment"), so it is off unless this is `true`.
    */
   LAB_ISSUE_OLD_DUE_BLOCK: bool.default(false),
+  /**
+   * frmAttachments: the folder the desktop saves attachments under, as the desktop computers
+   * reach it. It is what goes into Attachments.FilePath, so the desktop can open a file the web
+   * saved. (Desktop v3.4.3.1 reads it from GeneralConfig's AttachmentPath instead.)
+   */
+  ATTACHMENT_SHARE: z.string().min(1).default('\\\\192.168.0.210\\Attachments\\Production'),
+  /**
+   * The same folder as this server reaches it (the share mounted, or the folder itself when this
+   * machine hosts the share). Without it attachments are listed but cannot be opened or changed.
+   */
+  ATTACHMENT_DIR: z.string().min(1).optional(),
   DB_HOST: z.string().min(1),
   DB_PORT: z.coerce.number().int().positive().default(1433),
   DB_NAME: z.string().min(1),

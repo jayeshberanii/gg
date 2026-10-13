@@ -1156,6 +1156,7 @@ export function repSpace(input: string): string {
 
 export const authorMaster: ScreenDefinition = {
   screen: 'author-master',
+  attachments: true,
   table: 'authmast',
   primaryColumn: 'authorcokm',
   lockable: true,

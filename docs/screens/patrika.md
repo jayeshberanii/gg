@@ -234,7 +234,7 @@ four deletes in one transaction (`deleteRecord`).
 | Print Report › Send To Excel                         | engine's                                                                                                                                                                                                                                                                                                                                 |
 | For Selected Record › Graphics Detail                | `SELECT ISNULL(STUFF((SELECT ',' + CAST(graphicBkTkm AS VARCHAR(10)) FROM graphicbkt WHERE PatrikaKt IN(<selected ids>) FOR XML PATH('')),1,1,''),0)`. "0" → "No Record Found", else it opens `frmGraphicsDetail` with `StrId` (MDI). Web: an `open` action on `graphics-detail` (not ported yet; until then the "not available" window) |
 | For Selected Record › Utility › Request For LabIssue | one `LabIssueM` request per selected row, `Type='Patrika'`. See below                                                                                                                                                                                                                                                                    |
-| Utility › Show Attachments                           | **desktop only** (`CommonLibrary.frmAttachments`, files on disk) → `ATTACHMENTS_DESKTOP_ONLY`                                                                                                                                                                                                                                            |
+| Utility › Show Attachments                           | `CommonLibrary.frmAttachments` → `AttachmentsDialog` (see author-master.md, "Attachments")                                                                                                                                                                                                                                               |
 | Update RecordNo                                      | **`Visible = False`** in the Designer, so users never see it. **Do not port** (see bugs)                                                                                                                                                                                                                                                 |
 
 ### Request For LabIssue (`RequestForLabIssue(ForKt = 0)`)
@@ -316,7 +316,7 @@ No `.rpt`. Only the grid's Print Selected Column / Send To Excel.
   to a shared module if a third screen now needs it).
 - `deleteRecord`: the three child DELETEs, then the Patrika row, in the transaction.
 - Context menu: `graphics-detail` open action (empty → "No Record Found"),
-  `request-lab-issue` (shared with book-tran, Type Patrika), Show Attachments → desktop-only
+  `request-lab-issue` (shared with book-tran, Type Patrika), Show Attachments → `AttachmentsDialog`
   message. Omit Update RecordNo.
 - **Engine gaps:** none blocking. The only new piece is the shared lab-issue request helper.
 
@@ -368,7 +368,7 @@ now opens this screen with the selected requests' records.
   as decided for Lab Issue Master.
 - **Graphics Detail** returns `{kind:'open', screen:'graphics-detail', ids}` ("No Record Found"
   when none); until Graphics Detail is ported it opens the "not available" window.
-- **Show Attachments**: `ATTACHMENTS_DESKTOP_ONLY`.
+- **Show Attachments**: `AttachmentsDialog` (author-master.md, "Attachments").
 - Ctrl+L / Ctrl+U: `lockable: false` (no Locked column).
 - An Edit of a record the same user added today logs nothing (the engine's insertworkreports
   port, as on the desktop).

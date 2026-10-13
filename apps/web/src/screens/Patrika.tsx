@@ -2,7 +2,6 @@
 
 import type { ChildRow } from '@gglib/shared';
 import { copyWithNewKeys } from '@/features/master/commonTrans';
-// import { ATTACHMENTS_DESKTOP_ONLY } from '@/features/master/desktopOnly';
 import { MasterScreen } from '@/features/master/MasterScreen';
 import { netString } from '@/features/master/transSummary';
 import type { FieldSpec, FormContext, ScreenSpec, TransSpec } from '@/features/master/types';
@@ -186,17 +185,11 @@ const spec: ScreenSpec = {
         },
       ],
     },
-    // {
-    //   kind: 'submenu',
-    //   label: 'Utility',
-    //   items: [
-    //     {
-    //       kind: 'item',
-    //       label: 'Show Attachments',
-    //       onSelect: () => void a.alert(ATTACHMENTS_DESKTOP_ONLY),
-    //     },
-    //   ],
-    // },
+    {
+      kind: 'submenu',
+      label: 'Utility',
+      items: [{ kind: 'item', label: 'Show Attachments', onSelect: a.showAttachments }],
+    },
   ],
 };
 

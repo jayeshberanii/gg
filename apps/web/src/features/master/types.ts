@@ -486,6 +486,11 @@ export type ScreenActions = {
    * records another screen opened it with), then FillList.
    */
   showAll: () => void;
+  /**
+   * Utility › Show Attachment(s): CommonLibrary.frmAttachments for the record on the form
+   * (TranName = the screen's table, TranKm = the current record).
+   */
+  showAttachments: () => void;
   /** The engine's own items, for a screen that lays out its whole menu. */
   printSelectedColumn: () => void;
   printLayouts: ContextMenuItem[];

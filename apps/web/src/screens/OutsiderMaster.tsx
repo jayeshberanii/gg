@@ -1,6 +1,5 @@
 'use client';
 
-// import { ATTACHMENTS_DESKTOP_ONLY } from '@/features/master/desktopOnly';
 import { MasterScreen } from '@/features/master/MasterScreen';
 import type { ScreenSpec } from '@/features/master/types';
 import type { ScreenProps } from './registry';
@@ -148,17 +147,11 @@ const spec: ScreenSpec = {
       label: 'Send To',
       items: [{ kind: 'item', label: 'Party Master', onSelect: () => void a.run('send-to-party') }],
     },
-    // {
-    //   kind: 'submenu',
-    //   label: 'Utility',
-    //   items: [
-    //     {
-    //       kind: 'item',
-    //       label: 'Show Attachments',
-    //       onSelect: () => void a.alert(ATTACHMENTS_DESKTOP_ONLY),
-    //     },
-    //   ],
-    // },
+    {
+      kind: 'submenu',
+      label: 'Utility',
+      items: [{ kind: 'item', label: 'Show Attachments', onSelect: a.showAttachments }],
+    },
   ],
 };
 

@@ -20,6 +20,7 @@ import type { FormContext, PickOptions, ScreenActions, ScreenSpec } from './type
 import { useActionRunner } from './useActionRunner';
 import { type ListScope, type MasterState, useMasterScreen } from './useMasterScreen';
 import { WorkReportDialog } from './WorkReportDialog';
+import { AttachmentsDialog } from './AttachmentsDialog';
 
 type Secured =
   | { purpose: 'delete' }
@@ -110,6 +111,8 @@ function MasterWindow({
   const [secured, setSecured] = useState<Secured | null>(null);
   const [securityError, setSecurityError] = useState('');
   const [workReportOpen, setWorkReportOpen] = useState(false);
+  /** frmAttachments' TranKm: the record the form showed when the menu item was chosen. */
+  const [attachmentsOf, setAttachmentsOf] = useState<number | null>(null);
   /** The Select Column form, opened blank or straight onto a saved layout's report. */
   const [printing, setPrinting] = useState<{ layout: PrintLayout | null } | null>(null);
   /** Ctrl+F: the searchable columns, to pick "Search By" from. */
@@ -284,6 +287,7 @@ function MasterWindow({
     switches: state.switches,
     setField: state.setField,
     showAll: state.showAll,
+    showAttachments: () => setAttachmentsOf(state.currentId),
     printSelectedColumn: () => void openPrint(null),
     printLayouts: printLayoutItems,
     sendToExcel: exportGrid,
@@ -444,6 +448,14 @@ function MasterWindow({
           screen={spec.screen}
           recordId={state.currentId}
           onClose={() => setWorkReportOpen(false)}
+        />
+      )}
+
+      {attachmentsOf !== null && (
+        <AttachmentsDialog
+          screen={spec.screen}
+          recordId={attachmentsOf}
+          onClose={() => setAttachmentsOf(null)}
         />
       )}
 

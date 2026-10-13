@@ -11,6 +11,7 @@ import type { ActionResult, ScreenDefinition } from './registry.js';
  */
 export const outsiderMaster: ScreenDefinition = {
   screen: 'outsider-master',
+  attachments: true,
   table: 'OutsiderM',
   primaryColumn: 'OutsiderMkm',
   lockable: false,

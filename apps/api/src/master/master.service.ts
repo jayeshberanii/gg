@@ -133,7 +133,7 @@ export class MasterService {
    * With `enforceListFilter`: the record must be one of this user's (listFilter), or it does not
    * exist as far as they are concerned.
    */
-  private async assertVisible(
+  async assertVisible(
     db: Executor,
     def: ScreenDefinition,
     user: SessionUser | undefined,

@@ -2,6 +2,9 @@ import { apiErrorSchema, type ApiError } from '@gglib/shared';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8081/api';
 
+/** The address of a GET the browser opens itself (a file in a new tab). */
+export const apiUrl = (path: string) => `${API_URL}${path}`;
+
 export class ApiRequestError extends Error {
   constructor(readonly body: ApiError) {
     super(body.message);

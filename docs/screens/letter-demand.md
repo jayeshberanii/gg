@@ -187,7 +187,7 @@ are left behind (7 orphans locally). Web fix: delete the lines too.
 | Print Report › Send To Excel   | engine's                                                                                                                                                                                                                                                                                                    |
 | Print Report › Print Demand    | `LetterDemandReport.rpt` with parameter `LetterDemandMkm` = the current row → `frmReport`. Web: the HTML print view (below)                                                                                                                                                                                 |
 | Send To › WorkGiven Master     | `SELECT ISNULL(STUFF((SELECT DISTINCT ',' + CAST(WorkGivenMKt AS VARCHAR) FROM LetterDemandM WHERE LetterDemandMKm IN(<ids>) FOR XML PATH('')),1,1,''),0)` → if not ""/"0", open Work Given, else `"No Record Found"`. Work Given is not ported, so the web gives the "not available on the web yet" result |
-| Utility › Show Attachment      | `frmAttachments`. **Desktop only** (files deferred)                                                                                                                                                                                                                                                         |
+| Utility › Show Attachment      | `frmAttachments` → `AttachmentsDialog` (see author-master.md, "Attachments")                                                                                                                                                                                                                                |
 
 There is no Send To for Author, Prakashak or Magazine, despite the plan's hint. Those are FK
 fields on the form (F2 lookups), not menu links.
@@ -330,7 +330,7 @@ the Work Given F2 (the WorkGivenM grid via `masterGrid`, search box seeded with 
 `FieldSpec.f2SearchText`), the Book Detail popup, Save (Letter trimmed; NextReminderDt always
 saved), Delete, Print Report (Selected Column, Send To Excel, Print Demand), Send To › WorkGiven
 Master (Work Given is not on the web yet, so that window says so; no linked record gives "No
-Record Found"), Utility › Show Attachment (desktop only).
+Record Found"), Utility › Show Attachment.
 
 **Overflow messages** (new text): "Party Name cannot be longer than 200 characters", "Party
 Address … 500", "Vishay … 250", "FollowUp Remark … 250", "Status Remark … 150", "Letter No is too

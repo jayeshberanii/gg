@@ -168,8 +168,36 @@ commented out in the web menu anyway). Show Image of RefrenceT now reads its pat
 
 ## Not available on the web
 
-- Show Image of RefrenceT and Show Attachment: files on `F:\scantesting` and
-  `\\192.168.0.210\Attachments`, which the web server cannot reach. They say so.
+- Show Image of RefrenceT: files on `F:\scantesting`, which the web server cannot reach. It
+  says so.
+- Show Attachment: `CommonLibrary.frmAttachments`, ported as `AttachmentsDialog` (see
+  "Attachments" below).
+
+## Attachments (CommonLibrary.frmAttachments)
+
+Shared by Author Master, Letter Bhet, Letter Demand, Patrika and Outsider Master (Utility › Show
+Attachment(s)): `TranName` = the form's table, `TranKm` = the record on the form. A definition
+opts in with `attachments: true`; the routes are `/api/master/<screen>/attachments/<id>`
+(`attachments.service.ts`).
+
+- Rows: `Attachments (AttachmentKm identity, TranName, TranKm, FileName varchar(50), FilePath
+varchar(150), FileType varchar(5), enuser, endate)`. `lblEntry` = `GetEntryUser` on
+  `enuser` / `endate` only.
+- Desktop: New = OpenFileDialog (one file, a row with id 0); Save asks "Are you sure to save these
+  attachments?", inserts the new rows, copies each file (overwriting) to
+  `\\192.168.0.210\Attachments\Production\<TranName>/<TranKm>/<FileName>` (also the stored
+  `FilePath`; v3.4.3.1 reads the folder from `GeneralConfig.AttachmentPath`) and closes; Delete
+  asks "Are you sure to delete selected records?", deletes rows and files, then "(n) Records
+  Deleted Successfully"; double click on File Name opens the file, or "File At Location : <name>
+  Does Not Exists" (title "File Not Found").
+- Web: the same, with two settings. `ATTACHMENT_SHARE` is the folder as the desktops reach it
+  (what goes into `FilePath`); `ATTACHMENT_DIR` is that folder as the API server reaches it. A
+  file is found by `<ATTACHMENT_DIR>/<TranName>/<TranKm>/<FileName>` whatever host the stored
+  path names, so rows saved by either application open in both once the folder is the same one.
+  Without `ATTACHMENT_DIR` the rows are listed but cannot be opened or changed (503).
+- Differences: a name or extension that does not fit the columns is refused (the desktop fails
+  with SQL Server's truncation error); a file already gone does not stop Delete; images, PDF and
+  text open in a browser tab, any other type downloads; 30 MB per file.
 - Ctrl+numpad-plus / minus in popup cells (frmVGPMmast: add or rename a master entry) — shared
   engine item, not built yet.
 - F2 in the search box with "User Master" (frmSearchUser) — shared engine item, not built yet.

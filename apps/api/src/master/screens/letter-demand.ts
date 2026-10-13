@@ -46,6 +46,7 @@ type ReportRow = {
  */
 export const letterDemand: ScreenDefinition = {
   screen: 'letter-demand',
+  attachments: true,
   table: 'LetterDemandM',
   primaryColumn: 'LetterDemandMkm',
   lockable: false,

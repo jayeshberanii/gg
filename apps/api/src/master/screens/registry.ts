@@ -310,6 +310,11 @@ export type ScreenDefinition = {
    */
   workReport?: boolean;
   /**
+   * The form's Utility › Show Attachment(s) (CommonLibrary.frmAttachments with TranName = the
+   * table): the record's files in the Attachments table and the attachments folder.
+   */
+  attachments?: boolean;
+  /**
    * With `workReport`: which of Add / Edit / Delete the form logs, when not all three
    * (frmPartyMaster logs Edit only; frmParishistNamSuchi logs saves, not deletes).
    */

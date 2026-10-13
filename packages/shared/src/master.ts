@@ -158,6 +158,27 @@ export const securedIdsRequestSchema = z.object({
 
 export const lockRequestSchema = securedIdsRequestSchema.extend({ lock: z.boolean() });
 
+/** A row of CommonLibrary.frmAttachments (the Attachments table), for one record of a screen. */
+export type Attachment = {
+  id: number;
+  fileName: string;
+  fileType: string;
+  /** lblEntry (GetEntryUser): "who-dd/MM/yyyy | ". */
+  entry: string;
+  /** File.Exists(FilePath), as the server sees the attachments folder. */
+  exists: boolean;
+};
+
+/** frmAttachments' Save: the files added with New, each as base64. */
+export const saveAttachmentsRequestSchema = z.object({
+  files: z
+    .array(z.object({ name: z.string().min(1).max(260), data: z.string().max(48_000_000) }))
+    .min(1)
+    .max(50),
+});
+
+export const deleteAttachmentsRequestSchema = z.object({ ids });
+
 const childRowSchema = z.record(
   z.string(),
   z.union([z.string(), z.number(), z.boolean(), z.null()]),
