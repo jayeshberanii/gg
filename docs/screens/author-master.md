@@ -109,8 +109,8 @@ All visible items are ported, in the desktop's order, with its messages. Ids fol
 `GetSelectedTranId` (tree node in tree mode, else selected rows), selected rows, all grid rows
 (Find Missing/Duplicate RecNo, Half Name match), or ticked tree nodes (Author Detail Report, Author
 Reference, Kruti Author Check). Tables the desktop pushes into Excel download as CSV. Report items
-that open `frmWebBrowser` open the same pages of the desktop's report site in a new tab
-(`LEGACY_WEB_URL`, the contents of `ggurl.txt`). Lock Author / Unlock Author accept
+that open `frmWebBrowser` show the same pages of the desktop's report site, built by the API and
+shown in the web's own report window (see `reports.md`). Lock Author / Unlock Author accept
 `AUTHOR_LOCK_PASSWORD` or the second Security password (the desktop hard-codes the first one in
 source; here it is server config). Update pno in Auth-Prak Master runs on its own connection with
 no timeout. Display In Tree asks Uplevel/Downlevel and गुरुपरंपरा/वाचकवंश परंपरा, then shows the
@@ -136,8 +136,6 @@ Delete author not in use, Update ASamvatVK in Entrmast (`Visible = False`, no ha
 
 - Show Image of RefrenceT and Show Attachment: files on `F:\scantesting` and
   `\\192.168.0.210\Attachments`, which the web server cannot reach. They say so.
-- Report pages (Kruti/Author/Author Detail/Parampara report, Kruti Author Check) need
-  `LEGACY_WEB_URL`; without it they say it is not configured.
 - Ctrl+numpad-plus / minus in popup cells (frmVGPMmast: add or rename a master entry) — shared
   engine item, not built yet.
 - F2 in the search box with "User Master" (frmSearchUser) — shared engine item, not built yet.

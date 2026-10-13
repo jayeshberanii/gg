@@ -41,12 +41,6 @@ export const envSchema = z.object({
    * the second Security password still works there.
    */
   GRAPHICS_LOCK_PASSWORD: z.string().optional(),
-  /**
-   * The desktop's companion web site (the folder in ggurl.txt), whose report pages frmWebBrowser
-   * opens: Author Report, Kruti Report, Author Detail Report, Author Parampara Report. The web
-   * app opens the same pages in a new tab. Unset: those menu items say it is not configured.
-   */
-  LEGACY_WEB_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional()),
   DB_HOST: z.string().min(1),
   DB_PORT: z.coerce.number().int().positive().default(1433),
   DB_NAME: z.string().min(1),

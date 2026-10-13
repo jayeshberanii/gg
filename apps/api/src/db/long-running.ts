@@ -6,7 +6,7 @@ import type { Env } from '../config/env.js';
  * utilities that run for minutes (the desktop sets CommandTimeout = 720000 for them). It is
  * outside any transaction by design: those procedures manage their own work.
  */
-function connect(env: Env): Promise<Tedious.Connection> {
+export function connectLongRunning(env: Env): Promise<Tedious.Connection> {
   return new Promise((resolve, reject) => {
     const conn = new Tedious.Connection({
       server: env.DB_HOST,
@@ -40,7 +40,7 @@ export async function queryLongRunning(
   env: Env,
   statement: string,
 ): Promise<{ columns: string[]; rows: unknown[][] }> {
-  const conn = await connect(env);
+  const conn = await connectLongRunning(env);
   return new Promise((resolve, reject) => {
     let columns: string[] = [];
     let rows: unknown[][] = [];

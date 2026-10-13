@@ -85,7 +85,6 @@ describe.skipIf(!hasDb)(
         NODE_ENV: 'test',
         SECURITY_PASSWORD: SECURITY,
         AUTHOR_LOCK_PASSWORD: LOCK,
-        LEGACY_WEB_URL: 'http://reports.test',
       });
       const moduleRef = await Test.createTestingModule({ imports: [AppModule.forRoot(env)] })
         .overrideProvider(KYSELY)

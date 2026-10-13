@@ -286,7 +286,9 @@ if GroupNo were in the grid (it is not).
 
 ## Reports and printing
 
-No Crystal report; PrintSelectedColumn only (layouts `PRINT`
+No Crystal report. Print Report › Main Report (added in the later desktop version,
+`MainReportToolStripMenuItem_Click`) shows the report site's `Home/PrintTirthRakshaReport` page
+for the selected records (see `reports.md`). PrintSelectedColumn layouts: (`PRINT`
 `20,21,10,11,12,13,14,3,16,6,7,19,1,2,15,23,9,25,27,28`, `print ms`, `All`).
 
 ## Permissions

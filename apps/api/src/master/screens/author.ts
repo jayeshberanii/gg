@@ -1,9 +1,15 @@
 import type { ActionResult, FieldValue, GridValue } from '@gglib/shared';
-import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException } from '@nestjs/common';
 import { type RawBuilder, sql } from 'kysely';
 import { execLongRunning } from '../../db/long-running.js';
 import { type Executor, idList } from '../../db/legacy-sql.js';
 import { ident } from '../../db/trusted-sql.js';
+import {
+  authorDetailReport,
+  authorParamparaReport,
+  authorReport,
+  krutiFromAuthorReport,
+} from '../../reports/author.js';
 import { normalizeRow, normalizeValue, pickListOf } from '../values.js';
 import { netString, prepareWorkReport, signBetween, writeWorkReport } from '../work-report-log.js';
 import type { ActionContext, ScreenDefinition, TransDefinition } from './registry.js';
@@ -946,15 +952,6 @@ async function runProc(statement: () => Promise<unknown>): Promise<void> {
   }
 }
 
-function reportUrl(ctx: ActionContext, path: string): ActionResult {
-  if (!ctx.env.LEGACY_WEB_URL) {
-    throw new ServiceUnavailableException(
-      'The report web site (LEGACY_WEB_URL) is not configured on the server',
-    );
-  }
-  return { kind: 'url', url: `${ctx.env.LEGACY_WEB_URL.replace(/[\\/]+$/, '')}/gglibrary/${path}` };
-}
-
 async function openWhere(
   db: Executor,
   screen: string,
@@ -1438,20 +1435,32 @@ export const authorMaster: ScreenDefinition = {
         message: 'Export finished!',
       };
     },
-    'kruti-report': async (_db, _u, _s, ctx) => reportUrl(ctx, 'Home/PrintKrutiReport'),
-    'author-report': async (_db, _u, _s, ctx) => reportUrl(ctx, 'Home/PrintAuthorReport'),
-    'author-detail-report': async (_db, _u, selected, ctx) =>
-      reportUrl(ctx, `Home/PrintAuthorDetail?AuthorKm=${selected.join(',')}&KrutiCheck=0`),
-    async 'kruti-author-check'(db, _u, selected, ctx) {
-      if (!ctx.env.LEGACY_WEB_URL) return reportUrl(ctx, '');
-      await sql`EXEC SetTranIds 1, ${selected.join(',')}`.execute(db);
-      return reportUrl(ctx, 'Home/PrintAuthorDetail?KrutiCheck=1');
-    },
-    'parampara-report': async (_db, _u, _s, ctx) =>
-      reportUrl(
-        ctx,
-        `Home/PrintAuthorParamparaReport?PrintReference=${ctx.params.printReference ? 1 : 0}`,
+    // frmWebBrowser: the report site's pages, built here (reports/author.ts).
+    'kruti-report': async (db, _u, _s, ctx) => ({
+      kind: 'report',
+      document: await krutiFromAuthorReport({ db, env: ctx.env }),
+    }),
+    'author-report': async (db, _u, _s, ctx) => ({
+      kind: 'report',
+      document: await authorReport({ db, env: ctx.env }),
+    }),
+    // The site ignored AuthorKm and read TranIds, which this menu item never filled: the
+    // selected authors are what it meant to print.
+    'author-detail-report': async (db, _u, selected, ctx) => ({
+      kind: 'report',
+      document: await authorDetailReport({ db, env: ctx.env }, selected, false),
+    }),
+    'kruti-author-check': async (db, _u, selected, ctx) => ({
+      kind: 'report',
+      document: await authorDetailReport({ db, env: ctx.env }, selected, true),
+    }),
+    'parampara-report': async (db, _u, _s, ctx) => ({
+      kind: 'report',
+      document: await authorParamparaReport(
+        { db, env: ctx.env },
+        Boolean(ctx.params.printReference),
       ),
+    }),
     async 'author-reference'(db, _u, selected, ctx) {
       const result = await table(
         db,

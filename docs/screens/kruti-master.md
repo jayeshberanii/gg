@@ -85,7 +85,8 @@ Ported item for item. Print Report is shown only to Admin / AMaster and user ids
 38, 182; Lock / Unlock By Admin only to admins and AMaster, with the form's own password
 (`KRUTI_LOCK_PASSWORD`). Ctrl+L / Ctrl+U (the hidden Lock Selected Kruti items) use the Security
 password (`LockUnlockTransaction`). Ctrl+9 is Insert Ref Library No, Ctrl+T Toggle MultiSelect.
-Report pages open on `LEGACY_WEB_URL`; tables the desktop sends to Excel download as CSV.
+Report pages are built by the API and shown in the web's report window (see `reports.md`);
+tables the desktop sends to Excel download as CSV.
 
 ## Deliberate differences
 

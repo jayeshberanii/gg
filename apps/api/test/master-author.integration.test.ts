@@ -52,7 +52,6 @@ describe.skipIf(!hasDb)('Author Master via the master engine (integration)', () 
       NODE_ENV: 'test',
       SECURITY_PASSWORD: SECURITY,
       AUTHOR_LOCK_PASSWORD: AUTHOR_LOCK,
-      LEGACY_WEB_URL: 'http://reports.test',
     });
     const moduleRef = await Test.createTestingModule({ imports: [AppModule.forRoot(env)] })
       .overrideProvider(KYSELY)
@@ -439,11 +438,9 @@ describe.skipIf(!hasDb)('Author Master via the master engine (integration)', () 
     });
     expect(tree.body.columns).toEqual(['Authorkt', 'Guru1kt', 'Guru']);
 
-    const url = await post('author-report', { ids: [a.id] });
-    expect(url.body).toEqual({
-      kind: 'url',
-      url: 'http://reports.test/gglibrary/Home/PrintAuthorReport',
-    });
+    const report = await post('author-report', { ids: [a.id] });
+    expect(report.body.kind).toBe('report');
+    expect(report.body.document.title).toBe('Author Report');
 
     const lists = (await alice.get(`${API}/lists/pattavali`)).body as PickList;
     expect(lists.columns).toEqual(['ColumnMastkm', 'Name']);

@@ -5,6 +5,7 @@ import { type ReactNode, useState } from 'react';
 import { MessageBoxProvider } from '@/components/ui/MessageBox';
 import { AuthProvider } from '@/features/auth/AuthProvider';
 import { PrintHost } from '@/features/print/PrintHost';
+import { ReportHost } from '@/features/report/ReportHost';
 import { WorkLogHost } from '@/features/work-log/WorkLogHost';
 
 export function Providers({ children }: { children: ReactNode }) {
@@ -14,7 +15,9 @@ export function Providers({ children }: { children: ReactNode }) {
       <MessageBoxProvider>
         <AuthProvider>
           <WorkLogHost>
-            <PrintHost>{children}</PrintHost>
+            <PrintHost>
+              <ReportHost>{children}</ReportHost>
+            </PrintHost>
           </WorkLogHost>
         </AuthProvider>
       </MessageBoxProvider>

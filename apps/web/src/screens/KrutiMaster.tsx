@@ -1008,6 +1008,14 @@ export function KrutiMaster(props: ScreenProps) {
         async () => tableList(await a.call('krutis-of-sampraday', { sampraday: sampradayKt }, [])),
         false,
       );
+    /** PrintAgamSuchiReport: a sampraday, its krutis, Adi/Ant Vakya?, then the report page. */
+    const agamSuchi = (pattern: 0 | 1 | 2) => async () => {
+      const s = code(await sampraday());
+      if (s <= 0) return;
+      const ids = (await krutisOf(s))?.code.join(',') ?? '';
+      const printAdiAnt = await a.confirm('Do yo Want to Print Adi/Ant Vakya?');
+      await a.run('agam-suchi', { sampraday: s, ids, printAdiAnt, pattern }, []);
+    };
     /** AkaradiReport: a sampraday, then the report page. */
     const akaradi = (type: string) => async () => {
       const s = code(await sampraday());
@@ -1160,13 +1168,16 @@ export function KrutiMaster(props: ScreenProps) {
               //   const printAdiAnt = await a.confirm('Do yo Want to Print Adi/Ant Vakya?');
               //   await a.run('main-report', { sampraday: s, ids, printAdiAnt }, []);
               // }),
-              item('Main Report As Agam Suchi', async () => {
-                const s = code(await sampraday());
-                if (s <= 0) return;
-                const ids = (await krutisOf(s))?.code.join(',') ?? '';
-                const printAdiAnt = await a.confirm('Do yo Want to Print Adi/Ant Vakya?');
-                await a.run('agam-suchi', { sampraday: s, ids, printAdiAnt }, []);
-              }),
+              // PrintAgamSuchiReport(IsStartWithPurnataInKrutiDetail, PrintKrutiNoFirst).
+              {
+                kind: 'submenu',
+                label: 'Main Report As Agam Suchi',
+                items: [
+                  item('Main', agamSuchi(0)),
+                  item('Pattern 1(Start With Purnata In Kruti Detail)', agamSuchi(1)),
+                  item('Pattern 2(Print KrutiNo First)', agamSuchi(2)),
+                ],
+              },
               item('Main Report As Agam Suchi Index', async () => {
                 const s = code(await sampraday());
                 if (s <= 0) return;

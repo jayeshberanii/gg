@@ -2,6 +2,7 @@ import type { FieldValue, GridRow } from '@gglib/shared';
 import { BadRequestException } from '@nestjs/common';
 import { sql } from 'kysely';
 import { type Executor, idList } from '../../db/legacy-sql.js';
+import { tirthRakshaReport } from '../../reports/tirth-raksha.js';
 import { pickListOf } from '../values.js';
 import { authorMaster } from './author.js';
 import { AUTHOR_LIST, anyNames } from './book.js';
@@ -489,6 +490,12 @@ export const tirthRakshaMaster: ScreenDefinition = {
   },
 
   actions: {
+    // Print Report › Main Report (frmWebBrowser, Home/PrintTirthRakshaReport): the selected
+    // records, built here (reports/tirth-raksha.ts).
+    'main-report': async (db, _user, ids, ctx) => ({
+      kind: 'report',
+      document: await tirthRakshaReport({ db, env: ctx.env }, ids),
+    }),
     /** After the Reference popup names another book: txtBookSeq = GetMaxBookSeq(it). */
     async 'max-book-seq'(db, _user, _ids, ctx) {
       return {

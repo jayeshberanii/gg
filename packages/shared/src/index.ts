@@ -8,5 +8,6 @@ export * from './master.js';
 export * from './employee.js';
 export * from './leaves.js';
 export * from './print.js';
+export * from './report.js';
 export * from './lab-issue.js';
 export * from './issue.js';

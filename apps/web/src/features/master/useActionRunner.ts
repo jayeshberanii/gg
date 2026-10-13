@@ -3,6 +3,7 @@
 import type { ActionResult, GridRow } from '@gglib/shared';
 import { useMessageBox } from '@/components/ui/MessageBox';
 import { usePrintView } from '@/features/print/PrintHost';
+import { useReportView } from '@/features/report/ReportHost';
 import { useWorkspace } from '@/features/shell/Workspace';
 import { useWorkLog } from '@/features/work-log/WorkLogHost';
 import { api, errorMessage } from '@/lib/api';
@@ -30,7 +31,7 @@ export type ActionRunner = {
  * Runs a screen's right-click actions (`/master/<screen>/action/<name>`) and handles their
  * results: a message box, another window (`open`, or a new record there), a CSV download (`table`), a report
  * to print (`print`), the work log
- * dialog, a URL, or new rows for the grid (`rows`; a screen without them ignores those).
+ * dialog, a report page (`report`), or new rows for the grid (`rows`; a screen without them ignores those).
  * `defaultIds` are sent when the caller names none (the grid's selected records).
  */
 export function useActionRunner(
@@ -41,6 +42,7 @@ export function useActionRunner(
   const workspace = useWorkspace();
   const openWorkLog = useWorkLog();
   const openPrint = usePrintView();
+  const openReport = useReportView();
 
   async function call(
     action: string,
@@ -88,9 +90,6 @@ export function useActionRunner(
         else sendTableToExcel(result.title, result.columns, result.rows);
         if (result.message) await msg.alert(result.message);
         break;
-      case 'url':
-        window.open(result.url, '_blank', 'noopener');
-        break;
       case 'work-log':
         await openWorkLog({ logId: result.logId });
         break;
@@ -102,6 +101,13 @@ export function useActionRunner(
         // frmReport: the report's A4 pages, with the print dialog.
         if (result.message) await msg.alert(result.message);
         openPrint(result.document);
+        break;
+      case 'report':
+        // frmWebBrowser: the report page; Refresh runs the same action again.
+        openReport(result.document, async () => {
+          const again = await call(action, params, ids);
+          return again?.kind === 'report' ? again.document : null;
+        });
         break;
     }
   }

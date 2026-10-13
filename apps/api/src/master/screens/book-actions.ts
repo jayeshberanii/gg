@@ -1,7 +1,13 @@
 import type { ActionResult, GridRow, GridValue } from '@gglib/shared';
-import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException } from '@nestjs/common';
 import { type RawBuilder, sql } from 'kysely';
 import { type Executor, idList, inTransaction } from '../../db/legacy-sql.js';
+import {
+  bookReport,
+  lekhPrastavanaReport,
+  visheshParishishtReport,
+  visheshReport,
+} from '../../reports/book.js';
 import { prepareWorkReport, writeWorkReport } from '../work-report-log.js';
 import { ids, int, scalar, signBetween, table, text } from './book-common.js';
 import type { ActionContext, ScreenDefinition } from './registry.js';
@@ -34,15 +40,6 @@ async function openWhere(
   emptyMessage: string,
 ): Promise<ActionResult> {
   return { kind: 'open', screen, ids: await ids(db, query), emptyMessage };
-}
-
-function reportUrl(ctx: ActionContext, path: string): ActionResult {
-  if (!ctx.env.LEGACY_WEB_URL) {
-    throw new ServiceUnavailableException(
-      'The report web site (LEGACY_WEB_URL) is not configured on the server',
-    );
-  }
-  return { kind: 'url', url: `${ctx.env.LEGACY_WEB_URL.replace(/[\\/]+$/, '')}/gglibrary/${path}` };
 }
 
 /** A computed table the desktop pushes into Excel (SendtoExcel), or its "nothing" message. */
@@ -1111,8 +1108,12 @@ export const bookActions: Actions = {
   },
 
   // ------------------------------------------------------------------------------- Print ----
-  async 'new-vishesh-report'(_db, _user, _selected, ctx) {
-    return reportUrl(ctx, `Home/PrintVishesh?VibhagKt=${numberParam(ctx, 'vibhagKt')}`);
+  // frmWebBrowser: the report site's pages, built here (reports/book.ts).
+  async 'new-vishesh-report'(db, _user, _selected, ctx) {
+    return {
+      kind: 'report',
+      document: await visheshReport({ db, env: ctx.env }, [numberParam(ctx, 'vibhagKt')]),
+    };
   },
   async 'vishesh-columns-of-vibhag'(db, _user, _selected, ctx) {
     const t = await table(
@@ -1123,25 +1124,52 @@ export const bookActions: Actions = {
     );
     return { kind: 'table', title: 'list', ...t };
   },
-  async 'vishesh-parishisht-report'(_db, _user, _selected, ctx) {
-    return reportUrl(
-      ctx,
-      `Home/PrintParishishtNew?PrintDetail=${param(ctx, 'printDetail') ? 1 : 0}&VishColumnKt=${idsParam(ctx, 'column').join(',')}&VibhagKt=${idsParam(ctx, 'vibhag').join(',')}&PrintVibhag=${param(ctx, 'printVibhag') ? 1 : 0}`,
-    );
+  async 'vishesh-parishisht-report'(db, _user, _selected, ctx) {
+    return {
+      kind: 'report',
+      document: await visheshParishishtReport(
+        { db, env: ctx.env },
+        {
+          printDetail: Boolean(param(ctx, 'printDetail')),
+          columns: idsParam(ctx, 'column'),
+          vibhags: idsParam(ctx, 'vibhag'),
+          printVibhag: Boolean(param(ctx, 'printVibhag')),
+        },
+      ),
+    };
   },
-  async 'lekh-prastavana-report'(_db, _user, _selected, ctx) {
-    return reportUrl(
-      ctx,
-      `Home/PrintLekhPrastavana?VishColumnKt=${idsParam(ctx, 'column').join(',')}&VibhagKt=${idsParam(ctx, 'vibhag').join(',')}`,
-    );
+  // Home/PrintParishisht, the page the report above replaced. No menu item opens it, on the
+  // desktop either; it is kept so every page of the report site has its counterpart.
+  async 'vishesh-parishisht-report-old'(db, _user, _selected, ctx) {
+    return {
+      kind: 'report',
+      document: await visheshParishishtReport(
+        { db, env: ctx.env },
+        {
+          printDetail: Boolean(param(ctx, 'printDetail')),
+          columns: idsParam(ctx, 'column'),
+          vibhags: idsParam(ctx, 'vibhag'),
+          printVibhag: Boolean(param(ctx, 'printVibhag')),
+        },
+        true,
+      ),
+    };
   },
-  // Book Report: the chosen print numbers go to TranIds for the report site to read.
+  async 'lekh-prastavana-report'(db, _user, _selected, ctx) {
+    return {
+      kind: 'report',
+      document: await lekhPrastavanaReport(
+        { db, env: ctx.env },
+        idsParam(ctx, 'column'),
+        idsParam(ctx, 'vibhag'),
+      ),
+    };
+  },
+  // Book Report: the procedure reads the chosen print numbers from TranIds.
   async 'book-report'(db, _user, _selected, ctx) {
     const nos = idsParam(ctx, 'printNos');
     if (nos.length === 0) return { kind: 'message', message: '' };
-    const url = reportUrl(ctx, 'Home/PrintBookReport');
-    await sql`EXEC SetTranIds 1, ${nos.join(',')}`.execute(db);
-    return url;
+    return { kind: 'report', document: await bookReport({ db, env: ctx.env }, nos) };
   },
   async 'printno-with-kruti'(db, _user, _selected, ctx) {
     const from = numberParam(ctx, 'from');

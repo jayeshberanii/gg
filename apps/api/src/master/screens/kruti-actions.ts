@@ -1,7 +1,14 @@
 import type { ActionResult, GridValue } from '@gglib/shared';
-import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException } from '@nestjs/common';
 import { type RawBuilder, sql } from 'kysely';
 import { type Executor, idList, inTransaction } from '../../db/legacy-sql.js';
+import {
+  krutiAgamSuchiReport,
+  krutiAkaradiParishishtReport,
+  krutiAkaradiReport,
+  krutiPrakashakReport,
+  krutiReport,
+} from '../../reports/kruti.js';
 import { prepareWorkReport, writeWorkReport } from '../work-report-log.js';
 import { ids, int, nextKey, scalar, table, text } from './book-common.js';
 import { trustedSql } from '../../db/trusted-sql.js';
@@ -43,16 +50,6 @@ async function excel(
   query: RawBuilder<unknown>,
 ): Promise<ActionResult> {
   return { kind: 'table', title, ...(await table(db, query)) };
-}
-
-/** frmWebBrowser: a page of the desktop's report web site. */
-function reportUrl(ctx: ActionContext, path: string): ActionResult {
-  if (!ctx.env.LEGACY_WEB_URL) {
-    throw new ServiceUnavailableException(
-      'The report web site (LEGACY_WEB_URL) is not configured on the server',
-    );
-  }
-  return { kind: 'url', url: `${ctx.env.LEGACY_WEB_URL.replace(/[\\/]+$/, '')}/gglibrary/${path}` };
 }
 
 /** A stored procedure's own error, which the desktop shows as it is (MsgBox(ex.Message)). */
@@ -427,32 +424,50 @@ export const krutiActions: Actions = {
     // Cancel ("Short") reads columns the table does not have; the desktop fails the same way.
     return { kind: 'message', message: "Column 'ColumnNo' does not belong to table ." };
   },
+  // frmWebBrowser: the report site's pages, built here (reports/kruti.ts).
   async 'kruti-report'(db, _user, _selected, ctx) {
-    await sql`EXEC SetTranIds 1, ${textParam(ctx, 'pnos')}`.execute(db);
-    return reportUrl(ctx, 'Home/KrutiReport');
+    return {
+      kind: 'report',
+      document: await krutiReport({ db, env: ctx.env }, idsParam(ctx, 'pnos')),
+    };
   },
-  async 'akaradi-report'(_db, _user, _selected, ctx) {
-    return reportUrl(
-      ctx,
-      `Home/KrutiAkaradiParishishtReport?Type=${encodeURIComponent(textParam(ctx, 'type'))}&SampradayKt=${numberParam(ctx, 'sampraday')}`,
-    );
+  async 'akaradi-report'(db, _user, _selected, ctx) {
+    return {
+      kind: 'report',
+      document: await krutiAkaradiParishishtReport(
+        { db, env: ctx.env },
+        textParam(ctx, 'type'),
+        numberParam(ctx, 'sampraday'),
+      ),
+    };
   },
-  async 'main-report'(_db, _user, _selected, ctx) {
-    return reportUrl(
-      ctx,
-      `Home/KrutiAkaradiReport?SampradayKt=${numberParam(ctx, 'sampraday')}&StrKrutiMstKm=${encodeURIComponent(
-        textParam(ctx, 'ids'),
-      )}&PrintAdiAnt=${boolParam(ctx, 'printAdiAnt') ? 1 : 0}`,
-    );
+  async 'main-report'(db, _user, _selected, ctx) {
+    return {
+      kind: 'report',
+      document: await krutiAkaradiReport(
+        { db, env: ctx.env },
+        numberParam(ctx, 'sampraday'),
+        idsParam(ctx, 'ids'),
+        boolParam(ctx, 'printAdiAnt'),
+      ),
+    };
   },
+  // PrintAgamSuchiReport: `pattern` 1 starts the detail with Purnata, 2 adds the Kruti No.
   async 'agam-suchi'(db, _user, _selected, ctx) {
-    await sql`EXEC SetTranIds 1, ${textParam(ctx, 'ids')}`.execute(db);
-    return reportUrl(
-      ctx,
-      `Home/KrutiAkaradiAgamSuchiReport?SampradayKt=${numberParam(ctx, 'sampraday')}&PrintAdiAnt=${
-        boolParam(ctx, 'printAdiAnt') ? 1 : 0
-      }&PrintSwaroopShortName=0`,
-    );
+    const pattern = numberParam(ctx, 'pattern');
+    return {
+      kind: 'report',
+      document: await krutiAgamSuchiReport(
+        { db, env: ctx.env },
+        {
+          sampraday: numberParam(ctx, 'sampraday'),
+          krutis: idsParam(ctx, 'ids'),
+          printAdiAnt: boolParam(ctx, 'printAdiAnt'),
+          startWithPurnata: pattern === 1,
+          krutiNoFirst: pattern === 2,
+        },
+      ),
+    };
   },
   async 'agam-suchi-index'(db, _user, _selected, ctx) {
     return inTransaction(db, async (trx) => {
@@ -481,11 +496,15 @@ export const krutiActions: Actions = {
       )),
     };
   },
-  async 'kruti-prakashak-report'(_db, _user, _selected, ctx) {
-    return reportUrl(
-      ctx,
-      `Home/KrutiPrakashakReport?PrintAll=${boolParam(ctx, 'printAll') ? 1 : 0}&SampradayKt=${numberParam(ctx, 'sampraday')}`,
-    );
+  async 'kruti-prakashak-report'(db, _user, _selected, ctx) {
+    return {
+      kind: 'report',
+      document: await krutiPrakashakReport(
+        { db, env: ctx.env },
+        numberParam(ctx, 'sampraday'),
+        boolParam(ctx, 'printAll'),
+      ),
+    };
   },
   async 'krutis-of-sampraday'(db, _user, _selected, ctx) {
     return excel(

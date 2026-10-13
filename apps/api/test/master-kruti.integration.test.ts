@@ -108,7 +108,6 @@ describe.skipIf(!hasDb)(
         NODE_ENV: 'test',
         SECURITY_PASSWORD: SECURITY,
         KRUTI_LOCK_PASSWORD: KRUTI_LOCK,
-        LEGACY_WEB_URL: 'http://reports.test',
       });
       const moduleRef = await Test.createTestingModule({ imports: [AppModule.forRoot(env)] })
         .overrideProvider(KYSELY)
@@ -772,12 +771,12 @@ describe.skipIf(!hasDb)(
       expect(missing.kind).toBe('table');
       const dup = (await action(op, 'duplicate-nos', [], { gridIds: ids })).body as ActionResult;
       expect(dup).toMatchObject({ kind: 'table', rows: [] });
-      const url = (
+      const report = (
         await action(op, 'akaradi-report', [], { type: 'Vishay', sampraday: sampradayKt })
       ).body;
-      expect(url).toEqual({
-        kind: 'url',
-        url: `http://reports.test/gglibrary/Home/KrutiAkaradiParishishtReport?Type=Vishay&SampradayKt=${sampradayKt}`,
+      expect(report).toMatchObject({
+        kind: 'report',
+        document: { title: 'Kruti Akaradi Parishisht Report' },
       });
 
       await action(op, 'insert-ref-libno', [], {

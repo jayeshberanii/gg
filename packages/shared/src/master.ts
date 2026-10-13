@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { PrintDocument } from './print.js';
+import type { ReportDocument } from './report.js';
 
 /** A "Search By" entry (tblSearch, IsSearchable = 1). */
 export type SearchColumn = {
@@ -191,7 +192,6 @@ export const actionRequestSchema = z.object({
  *   own new-record defaults: frmInwordMaster's Send To › Letter Bhet Master when the inward has
  *   no letter yet (`{ inwordkt: <id>, inwordName: <Vibhag name> }`);
  * - `table`: a computed table the desktop pushes into Excel (SendtoExcel) or shows in frmPopup;
- * - `url`: a report page of the desktop's companion web app (frmWebBrowser);
  * - `work-log`: a day's attendance log to show in the logout work report (frmLogout(LogId, True));
  * - `message`: just a MsgBox;
  * - `cells`: values the form writes straight into grid rows it already shows (matched by the
@@ -202,6 +202,8 @@ export const actionRequestSchema = z.object({
  *   from a picked book. A plain right-click run only shows its message.
  * - `print`: a report to show as printable A4 pages (the web's frmReport + Crystal report):
  *   Letter Bhet's Print Bhet Pahoch, Letter Demand's Print Demand.
+ * - `report`: a report page of the desktop's companion web site (frmWebBrowser), built here:
+ *   Author Report, Book Report, the Kruti Akaradi reports …
  * Any of them may carry a `message` to show first.
  */
 export type ActionResult =
@@ -223,7 +225,6 @@ export type ActionResult =
       message?: string;
       emptyMessage?: string;
     }
-  | { kind: 'url'; url: string }
   | { kind: 'work-log'; logId: number }
   | { kind: 'message'; message: string }
   | { kind: 'cells'; rows: GridRow[]; message?: string }
@@ -233,7 +234,8 @@ export type ActionResult =
       trans: Record<string, { rows: ChildRow[]; extras?: ChildRow[][] }>;
       message?: string;
     }
-  | { kind: 'print'; document: PrintDocument; message?: string };
+  | { kind: 'print'; document: PrintDocument; message?: string }
+  | { kind: 'report'; document: ReportDocument };
 
 /**
  * clsCom1.insertworkreports after a Save that modified a record: the desktop asks which Work

@@ -399,6 +399,8 @@ function menu(a: ScreenActions): ContextMenuItem[] {
           : item('Selected Column', a.printSelectedColumn),
         // SendToExcelToolStripMenuItem1_Click is empty on the desktop.
         item('Send To Excel', () => undefined, true),
+        // frmWebBrowser, Home/PrintTirthRakshaReport: the selected records.
+        item('Main Report', () => void a.run('main-report')),
       ],
     },
     {
