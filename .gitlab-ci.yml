@@ -1,0 +1,107 @@
+# Mirrors the gglib-backend pipeline: Installation -> Verification (lint, type-check,
+# Sonar quality gate) -> Testing -> Build (Docker) -> Deploy.
+default:
+  tags:
+    - 'shared'
+    - 'automation'
+    - 'ci-cd'
+
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE =~ /^(push|merge_request_event|web|webide|manual)$/'
+      when: always
+
+stages:
+  - Installation
+  - Verification
+  - Testing
+  - Build
+  - Deploy
+
+variables:
+  NODE_VERSION: '24'
+  DOCKER_IMAGE: 'gitlabregistry.aspiresoftware.in/$CI_PROJECT_PATH'
+
+.node-base:
+  image: node:${NODE_VERSION}
+  before_script:
+    - corepack enable
+  needs:
+    - dependencies
+
+dependencies:
+  image: node:${NODE_VERSION}
+  stage: Installation
+  script:
+    - corepack enable
+    - pnpm install --frozen-lockfile
+    - pnpm --filter @gglib/shared --filter @gglib/db build
+  artifacts:
+    paths:
+      - node_modules/
+      - apps/*/node_modules/
+      - packages/*/node_modules/
+      - packages/*/dist/
+    expire_in: 1h
+
+lint:
+  extends: .node-base
+  stage: Verification
+  script:
+    - pnpm lint
+    - pnpm exec prettier --check .
+
+type-check:
+  extends: .node-base
+  stage: Verification
+  script:
+    - pnpm type-check
+
+code-quality-checks:
+  stage: Verification
+  image: sonarsource/sonar-scanner-cli:latest
+  needs: []
+  script:
+    - sonar-scanner -Dsonar.projectKey="$SONAR_PROJECT_KEY" -Dsonar.host.url="$SONAR_HOST_URL"
+      -Dsonar.login="$SONAR_TOKEN" -Dsonar.branch.name="$CI_COMMIT_BRANCH"
+      -Dsonar.qualitygate.wait=true -Dsonar.scanner.skipCertificateCheck=true
+
+tests:
+  extends: .node-base
+  stage: Testing
+  script:
+    - pnpm test
+  needs:
+    - dependencies
+    - lint
+    - type-check
+
+.docker-base:
+  image: docker:latest
+  stage: Build
+  services:
+    - name: docker:dind
+  before_script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+    - until docker info; do sleep 1; done
+  needs:
+    - tests
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+
+containerize-api:
+  extends: .docker-base
+  script:
+    - docker build --network=host --pull -f apps/api/Dockerfile -t "$DOCKER_IMAGE/api:$CI_COMMIT_SHORT_SHA" .
+    - docker push "$DOCKER_IMAGE/api:$CI_COMMIT_SHORT_SHA"
+
+containerize-web:
+  extends: .docker-base
+  script:
+    - docker build --network=host --pull -f apps/web/Dockerfile
+      --build-arg NEXT_PUBLIC_API_URL="$NEXT_PUBLIC_API_URL"
+      -t "$DOCKER_IMAGE/web:$CI_COMMIT_SHORT_SHA" .
+    - docker push "$DOCKER_IMAGE/web:$CI_COMMIT_SHORT_SHA"
+
+# Deploy (ArgoCD manifest bump) is added with the k8s/ manifests, following the
+# gglib-backend `.git-base` job. Not wired yet: there is no gglib-web environment.

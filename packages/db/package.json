@@ -1,0 +1,31 @@
+{
+  "name": "@gglib/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "type-check": "tsc -b",
+    "test": "echo \"@gglib/db: generated types only, nothing to test\"",
+    "codegen": "kysely-codegen --dialect mssql --out-file src/schema.ts"
+  },
+  "dependencies": {
+    "kysely": "^0.29.6"
+  },
+  "devDependencies": {
+    "@tediousjs/connection-string": "^1.1.0",
+    "@types/node": "^20.19.43",
+    "kysely-codegen": "^0.20.0",
+    "tarn": "^3.0.2",
+    "tedious": "^19.2.2"
+  }
+}

@@ -1,0 +1,477 @@
+@import 'tailwindcss';
+
+/*
+ * The GGLibrarySolution desktop look (WinForms on Windows), taken from the designer files:
+ *   - DataGridView headers: LightSteelBlue, DarkRed text, Arial Unicode MS 9pt;
+ *     rows Verdana 12pt; selection rgb(10,36,106) on white.
+ *   - Text boxes and labels: Times New Roman 14.25pt, FixedSingle border.
+ *   - ToolStrips: stretched gradient image (toolstrip-bg.jpg), image-only 23x22 buttons.
+ *   - Dialog forms: AliceBlue; MDI parent: white with log_5.jpg; caption rgb(128,64,64).
+ * There is one theme: the desktop has no dark mode.
+ */
+:root {
+  color-scheme: light;
+
+  /* WinForms system colours (Windows 10) */
+  --control: #f0f0f0; /* SystemColors.Control */
+  --window: #ffffff; /* SystemColors.Window */
+  --window-text: #000000;
+  --control-dark: #a0a0a0; /* grid lines */
+  --info: #ffffe1; /* SystemColors.Info */
+  --highlight: #0078d7; /* SystemColors.Highlight */
+
+  /* Desktop app colours */
+  --alice-blue: #f0f8ff;
+  --light-steel-blue: #b0c4de;
+  --dark-red: #8b0000;
+  --selection: #0a246a; /* Color.FromArgb(10, 36, 106) */
+  --thistle: #d8bfd8; /* UcSearch */
+  --caption-brown: #804040; /* Frmlibmain copyright label */
+  --time-red: #c00000; /* frmLogoutNew time values */
+
+  /* ToolStrip Professional renderer */
+  --tool-hover: #c1d2ee;
+  --tool-hover-border: #316ac5;
+  --tool-pressed: #98b5e2;
+
+  /* Fonts, with fallbacks that carry Gujarati/Devanagari glyphs off Windows */
+  --font-field:
+    'Times New Roman', Times, 'Liberation Serif', var(--font-noto-serif-gujarati), serif;
+  --font-ui: 'Segoe UI', Tahoma, var(--font-noto-sans), var(--font-noto-gujarati), sans-serif;
+  --font-grid: Verdana, 'DejaVu Sans', var(--font-noto-gujarati), sans-serif;
+  --font-grid-header:
+    'Arial Unicode MS', Arial, 'Liberation Sans', var(--font-noto-gujarati), sans-serif;
+}
+
+@theme inline {
+  --color-control: var(--control);
+  --color-window: var(--window);
+  --color-window-text: var(--window-text);
+  --color-control-dark: var(--control-dark);
+  --color-info: var(--info);
+  --color-highlight: var(--highlight);
+  --color-alice-blue: var(--alice-blue);
+  --color-light-steel-blue: var(--light-steel-blue);
+  --color-dark-red: var(--dark-red);
+  --color-selection: var(--selection);
+  --color-thistle: var(--thistle);
+  --color-caption-brown: var(--caption-brown);
+  --color-time-red: var(--time-red);
+  --font-sans: var(--font-ui);
+  --font-field: var(--font-field);
+  --font-grid: var(--font-grid);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--control);
+  color: var(--window-text);
+  font-family: var(--font-ui);
+  font-size: 12px; /* 9pt, the WinForms default */
+}
+
+/* ---- Controls --------------------------------------------------------------------- */
+
+/* TextBox, Times New Roman 14.25pt (19px), FixedSingle border */
+.win-textbox {
+  font-family: var(--font-field);
+  font-size: 19px;
+  height: 29px;
+  padding: 0 4px;
+  border: 1px solid #7a7a7a;
+  background: var(--window);
+  color: var(--window-text);
+}
+.win-textbox:focus {
+  outline: none;
+  border-color: var(--highlight);
+}
+.win-textbox[readonly] {
+  background: var(--control);
+}
+
+.win-label {
+  font-family: var(--font-field);
+  font-size: 19px;
+}
+
+/* Standard Button (Windows 10 visual style) */
+.win-button {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  min-width: 75px;
+  height: 23px;
+  padding: 0 10px;
+  border: 1px solid #adadad;
+  background: #e1e1e1;
+  color: var(--window-text);
+}
+.win-button:hover:not(:disabled) {
+  background: #e5f1fb;
+  border-color: var(--highlight);
+}
+.win-button:active:not(:disabled) {
+  background: #cce4f7;
+  border-color: #005499;
+}
+.win-button:focus-visible {
+  outline: 1px dotted #000;
+  outline-offset: -4px;
+  border-color: var(--highlight);
+}
+.win-button:disabled {
+  color: #838383;
+  background: #cccccc;
+  border-color: #bfbfbf;
+}
+
+/* FlatStyle.Popup button (frmlogin): flat until hovered */
+.win-popup-button {
+  font-family: var(--font-field);
+  font-size: 19px;
+  font-style: italic;
+  background: #fff;
+  color: #000;
+  border: 1px solid #6d6d6d;
+}
+.win-popup-button:hover:not(:disabled) {
+  border-color: #fff #6d6d6d #6d6d6d #fff;
+  box-shadow: 1px 1px 0 #000;
+}
+.win-popup-button:active:not(:disabled) {
+  border-color: #6d6d6d #fff #fff #6d6d6d;
+}
+.win-popup-button:focus-visible {
+  outline: 1px dotted #000;
+  outline-offset: -4px;
+}
+
+/* ToolStrip with the desktop's gradient background image, stretched */
+.win-toolstrip {
+  display: flex;
+  align-items: center;
+  height: 25px;
+  padding: 0 2px;
+  background: url('/legacy/toolstrip-bg.jpg') center / 100% 100% no-repeat;
+}
+.win-toolstrip-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 23px;
+  height: 22px;
+  border: 1px solid transparent;
+}
+.win-toolstrip-button img {
+  width: 16px;
+  height: 16px;
+}
+.win-toolstrip-button:hover:not(:disabled) {
+  background: var(--tool-hover);
+  border-color: var(--tool-hover-border);
+}
+.win-toolstrip-button:active:not(:disabled) {
+  background: var(--tool-pressed);
+  border-color: var(--tool-hover-border);
+}
+.win-toolstrip-button:focus-visible {
+  outline: none;
+  border-color: var(--tool-hover-border);
+}
+.win-toolstrip-button:disabled img {
+  filter: grayscale(1);
+  opacity: 0.45;
+}
+.win-toolstrip-separator {
+  width: 1px;
+  height: 18px;
+  margin: 0 3px;
+  background: #6a8ccb;
+  box-shadow: 1px 0 0 #fff;
+}
+
+/* ToolStripButton with DisplayStyle.Text, and ToolStripLabel / ToolStripComboBox */
+.win-toolstrip-text {
+  height: 22px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  white-space: nowrap;
+}
+button.win-toolstrip-text:hover:not(:disabled) {
+  background: var(--tool-hover);
+  border-color: var(--tool-hover-border);
+}
+button.win-toolstrip-text:active:not(:disabled) {
+  background: var(--tool-pressed);
+  border-color: var(--tool-hover-border);
+}
+button.win-toolstrip-text:focus-visible {
+  outline: none;
+  border-color: var(--tool-hover-border);
+}
+button.win-toolstrip-text:disabled {
+  color: #838383;
+}
+.win-toolstrip-field {
+  height: 21px;
+  padding: 0 2px;
+  border: 1px solid #7a7a7a;
+  background: #fff;
+  font-family: var(--font-ui);
+  font-size: 12px;
+}
+/* ToolStripLabel used as a panel caption (Tahoma 7.8pt Bold) */
+.win-toolstrip-caption {
+  font-family: Tahoma, sans-serif;
+  font-size: 10.4px;
+  font-weight: 700;
+  padding: 0 4px;
+}
+
+/* MenuStrip (Professional renderer) */
+.win-menustrip {
+  background: linear-gradient(#f6f8fc, #e3e9f3);
+  border-bottom: 1px solid #b6bcc6;
+  font-family: var(--font-ui);
+  font-size: 12px;
+}
+.win-menu-top {
+  padding: 3px 7px;
+  border: 1px solid transparent;
+}
+.win-menu-top:hover,
+.win-menu-top[aria-expanded='true'] {
+  background: var(--tool-hover);
+  border-color: var(--tool-hover-border);
+}
+.win-dropdown {
+  background:
+    linear-gradient(90deg, #fbfbf9, #e9e8e2) left / 24px 100% no-repeat,
+    #fcfcfc;
+  border: 1px solid #868686;
+  box-shadow: 2px 2px 3px rgb(0 0 0 / 0.25);
+  padding: 2px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+}
+.win-dropdown-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 24px;
+  padding: 3px 8px 3px 30px;
+  border: 1px solid transparent;
+  text-align: left;
+  white-space: nowrap;
+}
+.win-dropdown-item:hover:not(:disabled),
+.win-dropdown-item:focus-visible:not(:disabled) {
+  outline: none;
+  background: var(--tool-hover);
+  border-color: var(--tool-hover-border);
+}
+.win-dropdown-item[aria-checked='true']::before {
+  content: '✓';
+  position: absolute;
+  left: 8px;
+}
+.win-dropdown-item:disabled {
+  color: #a0a0a0;
+}
+.win-dropdown-separator {
+  height: 1px;
+  margin: 3px 2px 3px 28px;
+  background: #c5c5c5;
+}
+/* Print Selected Column: only the report's own table survives window.print(). */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #print-area,
+  #print-area * {
+    visibility: visible;
+  }
+  #print-area {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+  }
+}
+
+/*
+ * PrintView (features/print): plain A4 report sheets. On screen they sit on the window's grey
+ * background; in print only the copy under <body> (#print-report) is laid out, so long reports
+ * break across sheets.
+ */
+#print-report {
+  display: none;
+}
+.print-sheet {
+  page: report;
+  box-sizing: border-box;
+  width: 210mm;
+  min-height: 297mm;
+  margin: 0 auto 12px;
+  padding: 14mm 16mm;
+  background: #fff;
+  color: #000;
+  font-family: 'Times New Roman', Mangal, 'Nirmala UI', 'Noto Serif Devanagari', serif;
+  font-size: 12pt;
+  line-height: 1.45;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.4);
+}
+.print-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding-bottom: 6px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid #000;
+}
+.print-logo {
+  width: 40mm;
+  height: auto;
+}
+.print-heading {
+  flex: 1;
+  font-size: 14pt;
+  font-weight: bold;
+}
+.print-header-fields th {
+  padding-right: 4px;
+  font-weight: normal;
+  text-align: left;
+  white-space: nowrap;
+}
+.print-block {
+  margin-bottom: 10px;
+}
+.print-block-title {
+  font-weight: bold;
+  margin-bottom: 2px;
+}
+.print-label {
+  display: inline-block;
+  min-width: 25mm;
+}
+.print-text {
+  white-space: pre-wrap;
+}
+.print-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.print-table th,
+.print-table td {
+  border: 1px solid #000;
+  padding: 2px 6px;
+  vertical-align: top;
+}
+.print-table thead {
+  display: table-header-group;
+}
+.print-table tr {
+  break-inside: avoid;
+}
+.print-footer {
+  margin-top: 24px;
+}
+@page report {
+  size: A4 portrait;
+  margin: 0;
+}
+@media print {
+  body.print-report-open > *:not(#print-report) {
+    display: none !important;
+  }
+  body.print-report-open #print-report {
+    display: block;
+  }
+  body.print-report-open #print-report,
+  body.print-report-open #print-report * {
+    visibility: visible;
+  }
+  #print-report .print-sheet {
+    margin: 0;
+    box-shadow: none;
+    break-after: page;
+  }
+  #print-report .print-sheet:last-child {
+    break-after: auto;
+  }
+}
+
+/* A form's window frame (Windows 10) */
+.win-frame {
+  display: flex;
+  flex-direction: column;
+  background: var(--control);
+  border: 1px solid #6f8fbf;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.3);
+}
+.win-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding-left: 8px;
+  background: #fff;
+  color: #000;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  user-select: none;
+}
+.win-titlebar[data-inactive] {
+  color: #999;
+}
+.win-caption-button {
+  width: 46px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+.win-caption-button:hover {
+  background: #e5e5e5;
+}
+.win-caption-button[data-close]:hover {
+  background: #e81123;
+  color: #fff;
+}
+
+/* MessageBox body / footer (Windows 10) */
+.win-msgbox-body {
+  background: #fff;
+  padding: 24px 24px 20px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  white-space: pre-line;
+}
+.win-msgbox-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--control);
+}
+
+/* FullRowSelect: the whole selected row is navy with white text (DefaultCellStyle.Selection*). */
+.dgv .ag-row-selected .ag-cell {
+  color: #fff;
+}
+/* The current cell keeps the focus rectangle a DataGridView draws, not a fill of its own. */
+.dgv .ag-cell-focus:not(.ag-cell-inline-editing) {
+  outline: 1px dotted currentColor;
+  outline-offset: -2px;
+}
+.dgv .ag-cell-inline-editing {
+  border-radius: 0;
+}
