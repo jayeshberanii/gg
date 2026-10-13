@@ -19,11 +19,10 @@ Generic master engine; this screen supplies `apps/api/src/master/screens/author-
 | Box                              | Column                                | Notes                                                                                                                                   |
 | -------------------------------- | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | Name                             | `authortype`                          | required                                                                                                                                |
-| Attribute                        | `authtyattr`                          |                                                                                                                                         |
 | Brief                            | `brif`                                | shown and loaded, **never saved** — the repository's INSERT/UPDATE leave it out. Kept (an edit is silently dropped, as on the desktop). |
 | Remark / Short Name / Hindi Word | `remark` / `short_name` / `hindiword` |                                                                                                                                         |
 | Uplevel                          | `uplevalkt`                           | F2 (`select authtycokm,authortype from authtype`), shows `UplevalName`                                                                  |
-| IsPrint (checkbox)               | `IsPrint`                             | bit                                                                                                                                     |
+| IsPrint (checkbox)               | `IsPrint`                             | bit. On the form itself at (768,27), over the toolbar strip (`toolbarCheckbox`), not in the panel.                                      |
 
 ## Validation (`AuthTypeRepository.GetValidationMessage`)
 
@@ -31,7 +30,7 @@ Generic master engine; this screen supplies `apps/api/src/master/screens/author-
 
 ## Grid columns
 
-Id, Author Type, AuthAttr, Brief, Remark, Short Name, UpLevel, Hindi Word, CountI, Counters.
+Id, Author Type, Brief, Remark, Short Name, UpLevel, Hindi Word, CountI, Counters.
 
 ## Right-click menu
 
@@ -49,6 +48,16 @@ Id, Author Type, AuthAttr, Brief, Remark, Short Name, UpLevel, Hindi Word, Count
 The two BookM items pass a WhereCondition on the desktop (`BookMastKm IN (…)`); opening
 Book Master with those ids gives the same rows.
 
+## Desktop v3.4.3.1
+
+- The **Attribute** box, its "AuthAttr" grid column and `authtyattr` in INSERT / UPDATE are
+  gone. The column still exists; values already stored are left untouched (a new record gets
+  NULL). The denormalised author texts of other screens now use `authortype` instead.
+- Layout: Brief and Remark moved up one row (y 58 / 98), the panel is 140 high
+  (`SplitterDistance`), and IsPrint moved out of the panel onto the toolbar strip. The web
+  draws it with the engine's existing `toolbarCheckbox` (as Prakashak's Finished), so, like
+  those, it sits at the toolbar's right end beside the record navigator.
+
 ## Work report
 
 None — the form never calls `insertworkreports`; Work Report and Copy start disabled (the
@@ -61,5 +70,5 @@ Menu gating only.
 ## Verified
 
 - `apps/api/test/master-small.integration.test.ts` › Author Type Master: validate, max+1,
-  IsPrint round trip, Brief not saved, Uplevel name, edit, not-used-in-book list, in-use
+  IsPrint round trip, Brief not saved, `authtyattr` not written on add and kept on edit, Uplevel name, edit, not-used-in-book list, in-use
   action, lock refused.

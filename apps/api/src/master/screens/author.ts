@@ -282,7 +282,7 @@ async function saveAuthor(
     }
     await del('AuthorIdentityTran', sql`DELETE FROM AuthorIdentityT WHERE Authorkt = ${id}`);
     await del('AuthorGuruTran', sql`DELETE FROM AuthorGuruT WHERE Authorkt = ${id}`);
-    await del('SamvatTran', sql`DELETE FROM AuthorSamvatT WHERE Authorkt = ${id}`);
+    // v3.4.3.1: AuthorSamvatT is no longer emptied here; its rows are upserted below.
   }
 
   let authorId = id;
@@ -460,12 +460,49 @@ async function saveAuthor(
     `.execute(trx);
   }
 
-  for (const r of samvatGrid ?? []) {
+  // v3.4.3.1: Samvat rows are upserted by AuthorSamvatKm and the rest pruned, so the keys that
+  // authmast.RefSamvatKt stores (of this author or another) survive a save.
+  if (samvatGrid) {
+    // A key that is not one of this author's rows is a new row (the desktop would UPDATE
+    // whichever row has that key, another author's included).
+    const { rows: own } = await sql<{ id: number }>`
+      SELECT AuthorSamvatKm AS id FROM AuthorSamvatT WHERE AuthorKt = ${authorId}`.execute(trx);
+    const mine = new Set(own.map((o) => Number(o.id)));
+    const keep: number[] = [0];
+    for (const r of samvatGrid) {
+      const key = int(get(r, 'AuthorSamvatKm'));
+      if (mine.has(key)) {
+        await sql`
+          UPDATE AuthorSamvatT SET SamvatKindKt = ${int(get(r, 'SamvatKindKt'))}, Remark = ${text(get(r, 'Remark'))},
+            AsamvatKt = ${int(get(r, 'AsamvatKt'))}, Asamvat = ${text(get(r, 'Asamvat'))},
+            Vksamvat = ${int(get(r, 'Vksamvat'))}, BookTKt = ${int(get(r, 'BookTKt'))},
+            PageNo = ${text(get(r, 'PageNo'))}, SthalKt = ${int(get(r, 'SthalKt'))}, Seq = ${int(get(r, 'seq'))},
+            IsPrint = ${bit(get(r, 'IsPrint'))}
+          WHERE AuthorSamvatKm = ${key}
+        `.execute(trx);
+        keep.push(key);
+      } else {
+        const { rows: out } = await sql<{ id: number }>`
+          INSERT INTO AuthorSamvatT (AuthorKt, SamvatKindKt, Remark, AsamvatKt, Asamvat, Vksamvat, BookTKt, PageNo, SthalKt, IsPrint, seq)
+          OUTPUT INSERTED.AuthorSamvatKm AS id
+          VALUES (${authorId}, ${int(get(r, 'SamvatKindKt'))}, ${text(get(r, 'Remark'))}, ${int(get(r, 'AsamvatKt'))},
+            ${text(get(r, 'Asamvat'))}, ${int(get(r, 'Vksamvat'))}, ${int(get(r, 'BookTKt'))}, ${text(get(r, 'PageNo'))},
+            ${int(get(r, 'SthalKt'))}, ${bit(get(r, 'IsPrint'))}, ${int(get(r, 'seq'))})
+        `.execute(trx);
+        keep.push(Number(out[0]!.id));
+      }
+    }
+    // Deliberate difference: the desktop clears *this* author's RefSamvatKt whenever any of its
+    // samvat rows is removed (even when the referenced row stays) and leaves other authors
+    // pointing at a removed row. Here every reference to a row being removed is cleared, of any
+    // author, and nothing else.
     await sql`
-      INSERT INTO AuthorSamvatT (AuthorKt, SamvatKindKt, Remark, AsamvatKt, Asamvat, Vksamvat, BookTKt, PageNo, SthalKt, IsPrint, seq)
-      VALUES (${authorId}, ${int(get(r, 'SamvatKindKt'))}, ${text(get(r, 'Remark'))}, ${int(get(r, 'AsamvatKt'))},
-        ${text(get(r, 'Asamvat'))}, ${int(get(r, 'Vksamvat'))}, ${int(get(r, 'BookTKt'))}, ${text(get(r, 'PageNo'))},
-        ${int(get(r, 'SthalKt'))}, ${bit(get(r, 'IsPrint'))}, ${int(get(r, 'seq'))})
+      UPDATE authmast SET RefSamvatKt = NULL
+      WHERE RefSamvatKt IN (SELECT AuthorSamvatKm FROM AuthorSamvatT
+                            WHERE AuthorKt = ${authorId} AND AuthorSamvatKm NOT IN ${idList(keep)})
+    `.execute(trx);
+    await sql`
+      DELETE FROM AuthorSamvatT WHERE AuthorKt = ${authorId} AND AuthorSamvatKm NOT IN ${idList(keep)}
     `.execute(trx);
   }
 
@@ -1312,6 +1349,44 @@ export const authorMaster: ScreenDefinition = {
             (SELECT EnglishBookVisheshKt FROM EnglishBookVisheshAuthorT WHERE AuthorKt IN ${toIdsSql(selected)})`,
         'No Records Found',
       ),
+
+    /**
+     * v3.4.3.1 Show In Use (For Selected Record) › BookT: frmBookTranNew as a dialog over the
+     * Library Nos the selected authors refer to — the name's reference, the Guru parampara
+     * (the first kind present among गुरु, विद्यागुरु, गुरुपरंपरा), AnyName2, Sampraday and the
+     * printed Samvat rows. No message when nothing is found: the dialog opens empty.
+     */
+    'in-use-book-t': (db, _u, selected) => {
+      const sel = toIdsSql(selected);
+      const kind = (name: string) => sql`
+        OUTER APPLY (SELECT DISTINCT ISNULL(AuthorParamparaT.identity2kt, 0) AS GuruKt
+                     FROM AuthorParamparaT INNER JOIN columnmaster ON AuthorParamparaT.identity2kt = columnmaster.ColumnMastkm
+                     WHERE AuthorParamparaT.AuthorParamparaKm = AP.AuthorParamparaKm AND columnmaster.Name = ${name})`;
+      return openWhere(
+        db,
+        'book-tran',
+        sql`
+          SELECT tid AS id FROM BookT WHERE tid IN (
+            SELECT DISTINCT AuthorNameRefBookTKt AS BookTKt FROM authmast
+            WHERE authorcokm IN ${sel} AND ISNULL(AuthorNameRefBookTKt, 0) > 0
+            UNION
+            SELECT DISTINCT AP.BookTKt FROM AuthorParamparaT AP
+            ${kind('गुरु')} AS tblGuru
+            ${kind('विद्यागुरु')} AS tblVidhyaGuru
+            ${kind('गुरुपरंपरा')} AS tblGuruParampara
+            WHERE AP.Authorkt IN ${sel}
+              AND AP.identity2kt = CASE WHEN tblGuru.GuruKt > 0 THEN tblGuru.GuruKt
+                                        WHEN tblVidhyaGuru.GuruKt > 0 THEN tblVidhyaGuru.GuruKt
+                                        WHEN tblGuruParampara.GuruKt > 0 THEN tblGuruParampara.GuruKt ELSE -3 END
+            UNION
+            SELECT DISTINCT AuthMAnyLibNoT2.BookTKt FROM AuthMAnyLibNoT2 WHERE AuthorKt IN ${sel}
+            UNION
+            SELECT DISTINCT AuthorSampradayT.BookTKt FROM AuthorSampradayT WHERE AuthorKt IN ${sel}
+            UNION
+            SELECT DISTINCT AuthorSamvatT.BookTKt FROM AuthorSamvatT WHERE IsPrint = 1 AND AuthorKt IN ${sel})`,
+        '',
+      );
+    },
 
     // For Selected Record › Utility ›
     async 'set-link-with-sadi'(db, _user, selected, ctx) {

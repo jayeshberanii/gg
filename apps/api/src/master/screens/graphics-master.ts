@@ -531,7 +531,7 @@ export const graphicsMaster: ScreenDefinition = {
      * Utility › Request For Book(LabIssue): a LabIssueM request for each selected row's book
      * (For party 0, Type Book). The messages name the row's Book Name, as on the desktop.
      */
-    async 'request-lab-issue'(db, user, ids): Promise<ActionResult> {
+    async 'request-lab-issue'(db, user, ids, ctx): Promise<ActionResult> {
       const { rows } = await sql<{ id: number; BookTKt: number | null; bkname: string | null }>`
         SELECT graphicBkm AS id, BookTKt, bkname FROM GraphicBKM WHERE graphicBkm IN ${toIds(ids)}
       `.execute(db);
@@ -539,7 +539,17 @@ export const graphicsMaster: ScreenDefinition = {
       const items = ids
         .filter((id) => byId.has(id))
         .map((id) => ({ id: int(byId.get(id)!.BookTKt), name: text(byId.get(id)!.bkname) }));
-      return { kind: 'message', message: await requestLabIssue(db, user.id, items, 0, 'Book') };
+      return {
+        kind: 'message',
+        message: await requestLabIssue(
+          db,
+          user.id,
+          items,
+          0,
+          'Book',
+          ctx.env.LAB_ISSUE_OLD_DUE_BLOCK,
+        ),
+      };
     },
   },
 };

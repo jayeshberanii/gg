@@ -75,8 +75,13 @@ export class MasterController {
     @Param('screen') screen: string,
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: SessionUser,
+    @Query() query: Record<string, unknown>,
   ): Promise<GridRow> {
-    return this.master.record(screen, id, undefined, user);
+    // The form's switches (ScreenDefinition.listFilter's params): plain text only.
+    const params = Object.fromEntries(
+      Object.entries(query).filter((e): e is [string, string] => typeof e[1] === 'string'),
+    );
+    return this.master.record(screen, id, undefined, user, params);
   }
 
   /** lblEntry: who entered and last modified the record. */
@@ -339,6 +344,6 @@ export class MasterController {
     @CurrentUser() user: SessionUser,
     @Body(new ZodValidationPipe(actionRequestSchema)) body: z.infer<typeof actionRequestSchema>,
   ): Promise<ActionResult> {
-    return this.master.action(screen, user, name, body.ids, body.params);
+    return this.master.action(screen, user, name, body.ids, body.params, undefined, body.switches);
   }
 }

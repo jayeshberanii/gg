@@ -31,6 +31,7 @@ export default defineConfig({
         E2E_VERBOSE: process.env.E2E_VERBOSE ?? '',
         SECURITY_PASSWORD: 'e2e-security-pw',
         GRAPHICS_LOCK_PASSWORD: 'e2e-graphics-lock-pw',
+        KRUTI_LOCK_PASSWORD: 'e2e-kruti-lock-pw',
       },
       reuseExistingServer: false,
       timeout: 120_000,

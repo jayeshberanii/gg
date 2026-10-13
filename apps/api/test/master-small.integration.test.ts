@@ -94,12 +94,21 @@ describe.skipIf(!hasDb)('small Master screens via the master engine (integration
       expect(record).toMatchObject({ authortype: 'વેબ પ્રકાર', IsPrint: true, uplevalkt: up });
       expect(record.brif ?? '').toBe('');
       expect(added.body.row.UplevalName).toBeTruthy();
+      // v3.4.3.1: the Attribute column is no longer written, on add or on edit.
+      const attr = async () =>
+        (
+          await sql<{ a: string | null }>`
+            SELECT authtyattr AS a FROM authtype WHERE authtycokm = ${next}`.execute(h.trx)
+        ).rows[0]!.a;
+      expect(await attr()).toBeNull();
+      await sql`UPDATE authtype SET authtyattr = N'kept' WHERE authtycokm = ${next}`.execute(h.trx);
 
       const edited = await h.user
         .post(`${API}/save`)
         .send({ id: next, fields: { authortype: 'Edited', IsPrint: false } });
       expect(edited.body.row).toMatchObject({ authortype: 'Edited' });
       expect((await h.user.get(`${API}/record/${next}`)).body).toMatchObject({ IsPrint: false });
+      expect(await attr()).toBe('kept');
     });
 
     it('lists types not used in books and finds where one is used', async () => {

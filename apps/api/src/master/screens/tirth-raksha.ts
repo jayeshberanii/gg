@@ -427,9 +427,7 @@ export const tirthRakshaMaster: ScreenDefinition = {
     // TranName "Author" and its sub-popups "multiauthortype" / "multiauthor".
     AuthTran: {
       lookups: {
-        authortype: list(
-          sql`SELECT authtycokm, authortype, authtyattr FROM authtype ORDER BY authortype`,
-        ),
+        authortype: list(sql`SELECT authtycokm, authortype FROM authtype ORDER BY authortype`),
         sign: SIGN_UNDER_10,
         authorname: AUTHOR_LIST,
         anyaname: anyNames,

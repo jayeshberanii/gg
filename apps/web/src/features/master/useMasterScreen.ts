@@ -122,11 +122,20 @@ export function useMasterScreen(
     initialScope ??
       (spec.openWith && initialIds ? { ids: initialIds } : newScope ? { params: newScope } : {}),
   );
+  /** ToolbarCheckbox.listSwitch: the form's ticked switches (`name: true`). */
+  const [switches, setSwitches] = useState<Record<string, boolean>>({});
+  const switchesRef = useRef(switches);
+  /** The switches as request params, or nothing when none is ticked. */
+  const switchParams = () =>
+    Object.keys(switchesRef.current).length > 0 ? { params: switchesRef.current } : {};
   /** The list request: StrId (the given ids, or the window's own) and the form's switches. */
   const listBody = (ids?: number[], params = listParams.current) => {
     const strId = ids ?? (spec.refreshKeepsIds ? initialIds : undefined) ?? scope.current.ids;
-    const switches = scope.current.params ? { ...params, ...scope.current.params } : params;
-    return { ...(strId ? { ids: strId } : {}), ...(switches ? { params: switches } : {}) };
+    const merged = { ...params, ...scope.current.params, ...switchesRef.current };
+    return {
+      ...(strId ? { ids: strId } : {}),
+      ...(Object.keys(merged).length > 0 || params ? { params: merged } : {}),
+    };
   };
 
   const column0 = (id: string): SearchColumn | undefined =>
@@ -251,7 +260,7 @@ export function useMasterScreen(
       setEntryText('');
       try {
         const [record, entry] = await Promise.all([
-          api.get<GridRow>(`${base}/record/${id}`),
+          api.get<GridRow>(`${base}/record/${id}${queryOf(switchParams().params)}`),
           spec.entryLabel
             ? api.get<{ text: string }>(`${base}/record/${id}/entry`)
             : Promise.resolve({ text: '' }),
@@ -278,6 +287,7 @@ export function useMasterScreen(
           if (f.kt) nextTags[f.name] = Number(column(record, f.name) ?? 0) || 0;
         }
         for (const c of toolbarCheckboxes(spec)) {
+          if (c.listSwitch) continue;
           const v = column(record, c.name);
           nextFields[c.name] = v === true || v === 1 || v === 'True' ? 'True' : 'False';
         }
@@ -575,7 +585,8 @@ export function useMasterScreen(
             ? fields[f.name] || (f.keepEmptyDate && strMode === 'Edit' ? '' : todayIso())
             : (fields[f.name] ?? '');
     }
-    for (const c of toolbarCheckboxes(spec)) payload[c.name] = fields[c.name] === 'True';
+    for (const c of toolbarCheckboxes(spec))
+      if (!c.listSwitch) payload[c.name] = fields[c.name] === 'True';
     for (const [key, t] of Object.entries(spec.trans ?? {})) {
       const state = trans[key];
       if (!state || !(state.opened || t.sendLoaded) || t.local) continue;
@@ -811,6 +822,16 @@ export function useMasterScreen(
 
   const refresh = () => void reload();
 
+  /** A ToolbarCheckbox.listSwitch's CheckedChanged: FillList with the new switch. */
+  const setSwitch = (name: string, on: boolean) => {
+    const next = { ...switchesRef.current };
+    if (on) next[name] = true;
+    else delete next[name];
+    switchesRef.current = next;
+    setSwitches(next);
+    void reload();
+  };
+
   /** "Show All Records": FillList without the window's WhereCondition (ScreenSpec.openWith). */
   const showAll = () => {
     scope.current = {};
@@ -848,6 +869,7 @@ export function useMasterScreen(
         notIn: !searchIn,
         values,
         text,
+        ...switchParams(),
       });
       setRows(next);
       pushHistory(next, '', '');
@@ -863,7 +885,14 @@ export function useMasterScreen(
   const searchRange = async (columnId: number, from: string, to: string) => {
     setLastRange(`${from}-${to}`);
     try {
-      setRows(await api.post<GridRow[]>(`${base}/search-range`, { columnId, from, to }));
+      setRows(
+        await api.post<GridRow[]>(`${base}/search-range`, {
+          columnId,
+          from,
+          to,
+          ...switchParams(),
+        }),
+      );
     } catch (err) {
       await fail(err);
     }
@@ -876,6 +905,7 @@ export function useMasterScreen(
           columnId,
           blank,
           ...(withinGrid ? { withinIds: visibleIds } : {}),
+          ...switchParams(),
         }),
       );
     } catch (err) {
@@ -997,6 +1027,8 @@ export function useMasterScreen(
     setLocked: setRecordsLocked,
     copy,
     refresh,
+    switches,
+    setSwitch,
     showAll,
     reload,
     showRows,
@@ -1013,7 +1045,7 @@ export function useMasterScreen(
 }
 
 /** `?a=1&b=2` for values the server reads as query text, or '' for none. */
-function queryOf(params?: Record<string, string | number>): string {
+function queryOf(params?: Record<string, string | number | boolean>): string {
   if (!params || Object.keys(params).length === 0) return '';
   return `?${new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)])).toString()}`;
 }

@@ -24,7 +24,7 @@ import {
   text,
   val,
 } from './book-common.js';
-import type { ScreenDefinition, TransDefinition } from './registry.js';
+import type { ListParams, ScreenDefinition, TransDefinition } from './registry.js';
 import { saveVishayEntries, VISHAY_ENTRY_LOOKUPS } from './vishay-entry.js';
 
 /**
@@ -81,7 +81,10 @@ async function signShortName(db: Executor, kt: number, vibhagSign: boolean) {
   return r && r.ShortNm !== '' && Number(r.ColumnNo) > 0 ? `(${r.ShortNm})` : '';
 }
 
-/** Save(): txtAuthTran rebuilt from the Author popup's rows (authtyattr, names, marks). */
+/**
+ * Save(): txtAuthTran rebuilt from the Author popup's rows (the type's name —
+ * authtype.authortype since v3.4.3.1, authtyattr before — names, marks).
+ */
 async function authorText(
   db: Executor,
   authors: Row[],
@@ -96,7 +99,7 @@ async function authorText(
     for (const t of authTypes.filter((r) => get(r, 'praksnauthorkt') === key)) {
       const attr = await scalar<string>(
         db,
-        sql`SELECT ISNULL(authtyattr, '') FROM authtype WHERE authtycokm = ${int(get(t, 'authortypekt'))}`,
+        sql`SELECT ISNULL(authortype, '') FROM authtype WHERE authtycokm = ${int(get(t, 'authortypekt'))}`,
       );
       st = signBetween(st.trim(), attr ?? '');
       st += await signShortName(db, int(get(t, 'signkt')), true);
@@ -715,9 +718,7 @@ const TRANS: Record<string, TransDefinition> = {
   AuthTran: {
     lookups: {
       // multiauthortype
-      authortype: list(
-        sql`SELECT authtycokm, authortype, authtyattr FROM authtype ORDER BY authortype`,
-      ),
+      authortype: list(sql`SELECT authtycokm, authortype FROM authtype ORDER BY authortype`),
       sign: SIGN_UNDER_10,
       // multiauthor
       authorname: AUTHOR_LIST,
@@ -835,10 +836,32 @@ const TRANS: Record<string, TransDefinition> = {
 // The definition
 // ------------------------------------------------------------------------------------------
 
-/** GetDataTable's DefaultCondition: an Operator does not see CM / MS / CP / SN numbers. */
-function operatorFilter(user: SessionUser) {
-  if (user.userType !== UserType.Operator) return null;
-  return sql`txtBookTran NOT LIKE '%CM%' AND txtBookTran NOT LIKE '%ms%' AND txtBookTran NOT LIKE '%CP%' AND txtBookTran NOT LIKE '%SN%'`;
+/** chkSearchNotInOB ("Search Not In OB"), as the client sends it with a request. */
+export const SEARCH_NOT_IN_OB = 'SearchNotInOB';
+
+const switchOn = (v: unknown) => v === true || v === 'true' || v === 'True' || v === 1 || v === '1';
+
+/** GetDataTable's " and ISNULL(txtBookTran,'') not like '%OB%'" while the box is ticked. */
+export function notInObCondition(params?: Record<string, unknown>) {
+  return switchOn(params?.[SEARCH_NOT_IN_OB]) ? sql`ISNULL(txtBookTran, '') NOT LIKE '%OB%'` : null;
+}
+
+/**
+ * GetDataTable's DefaultCondition: an Operator does not see CM / MS / CP / SN numbers (NULL-safe
+ * since v3.4.3.1: a book with no txtBookTran is visible), and nobody sees OB numbers while
+ * "Search Not In OB" is ticked. The search box gets the same condition; the desktop's FillList
+ * hands UcSearch the OB condition in place of the Operator's one, and that one without ISNULL
+ * (see the doc).
+ */
+function bookFilter(user: SessionUser, params?: ListParams) {
+  const parts = [];
+  if (user.userType === UserType.Operator)
+    parts.push(
+      sql`ISNULL(txtBookTran, '') NOT LIKE '%CM%' AND ISNULL(txtBookTran, '') NOT LIKE '%ms%' AND ISNULL(txtBookTran, '') NOT LIKE '%CP%' AND ISNULL(txtBookTran, '') NOT LIKE '%SN%'`,
+    );
+  const ob = notInObCondition(params);
+  if (ob) parts.push(ob);
+  return parts.length ? sql.join(parts, sql` AND `) : null;
 }
 
 export const bookMaster: ScreenDefinition = {
@@ -848,7 +871,7 @@ export const bookMaster: ScreenDefinition = {
   lockable: true,
   // FillList passes TotRecords = 100 unless the form was opened for given records.
   listLimit: 100,
-  listFilter: operatorFilter,
+  listFilter: bookFilter,
   workReport: true,
   // The popups whose rows Save() logs with CompareDataTable (its ByRef arguments write back).
   workReportTrans: ['PrakTran', 'AuthTran', 'praksnVisheshTran', 'SubjTran', 'BookSubjTran'],
@@ -965,6 +988,10 @@ export const bookMaster: ScreenDefinition = {
     'link-with-kruti': list(sql`
       SELECT vishaycokm, vishay_nm, brif FROM vishay WHERE ISNULL(vishay_nm, '') <> '' AND brif LIKE N'KrutiLinking%'
       ORDER BY vishay_nm`),
+    // Update Kruti Seq's pick (v3.4.3.1).
+    'kruti-sampraday': list(
+      sql`SELECT ColumnMastkm, Name FROM columnmaster WHERE Vibhag = 'KrutiSampraday' ORDER BY Name`,
+    ),
     'project-work': list(
       sql`SELECT ColumnMastkm, Name FROM columnmaster WHERE Vibhag = 'BookProjectWork' ORDER BY Name`,
     ),

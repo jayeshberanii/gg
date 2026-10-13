@@ -70,10 +70,7 @@ export const visheshMaster: ScreenDefinition = {
       if (refs)
         await sql`DELETE FROM RefrenceT WHERE Tablekt = ${tk} AND RecordKt = ${id}`.execute(trx);
       if (anya) await sql`DELETE FROM VisheshAnyaNameT WHERE VisheshKt = ${id}`.execute(trx);
-      if (adya)
-        await sql`DELETE FROM VisheshAdy                                    aSthapakT WHERE VisheshKt = ${id}`.execute(
-          trx,
-        );
+      if (adya) await sql`DELETE FROM VisheshAdyaSthapakT WHERE VisheshKt = ${id}`.execute(trx);
       await sql`
         UPDATE visheshMast SET Vishesh = ${v.Vishesh}, remark = ${v.remark}, UplevelKt = ${v.UplevelKt},
           Brief = ${v.Brief}, VisheshNo = ${v.VisheshNo}, ShortNm = ${v.ShortNm}, Notes = ${v.Notes},

@@ -78,9 +78,15 @@ export function FormFields({
   state,
   ctx,
   openTransRef,
+  panelExtra,
 }: {
   state: MasterState;
   ctx: FormContext;
+  /**
+   * Controls of the panel that are not boxes (frmKrutiMasterNew's AdminLockToolStrip), placed by
+   * the caller; `x` scales a designer x position as the fields' are.
+   */
+  panelExtra?: (x: (v: number) => number) => React.ReactNode;
   /** Set to a function that opens a popup by its key, as F2 on its box does. */
   openTransRef?: React.RefObject<((key: string) => void) | null>;
 }) {
@@ -293,6 +299,7 @@ export function FormFields({
           </span>
         ),
       )}
+      {panelExtra?.(x)}
       {(spec.groups ?? []).map((g) => (
         <fieldset
           key={g.text}

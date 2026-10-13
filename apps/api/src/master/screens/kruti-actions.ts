@@ -1,5 +1,5 @@
-import type { ActionResult, GridValue } from '@gglib/shared';
-import { BadRequestException } from '@nestjs/common';
+import { type ActionResult, type GridValue, type SessionUser, UserType } from '@gglib/shared';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { type RawBuilder, sql } from 'kysely';
 import { type Executor, idList, inTransaction } from '../../db/legacy-sql.js';
 import {
@@ -82,6 +82,69 @@ export function expandNumbers(input: string): number[] {
   return out;
 }
 
+/** insertworkreports(TransactionName, PrimaryColumn, id, user, dtOld, dtNew, workType). */
+async function logChange(
+  db: Executor,
+  userId: number,
+  id: number,
+  oldRow: Record<string, GridValue>,
+  newRow: Record<string, GridValue>,
+  workType: string,
+) {
+  const prepared = await prepareWorkReport(
+    db,
+    'krutiMst',
+    'krutimstkm',
+    id,
+    userId,
+    oldRow,
+    newRow,
+    workType,
+  );
+  if (prepared?.kind === 'write') {
+    await writeWorkReport(
+      db,
+      'krutiMst',
+      'krutimstkm',
+      id,
+      userId,
+      prepared.remark,
+      prepared.workTypeId,
+      prepared.mistake,
+      prepared.mistakeCount,
+      prepared.workTypeName,
+    );
+  }
+}
+
+/** cntMenu_Opening: Replace Records is for IsAdminLogin and AMaster. */
+function assertReplaceRecords(user: SessionUser) {
+  if (!user.isAdmin && user.userType !== UserType.AMaster)
+    throw new ForbiddenException('Not allowed');
+}
+
+/** FindAndReplace's Type: the visheshMast category, the krutiMst column and the grid's name column. */
+const VISHESH_REPLACE = {
+  Ktype: { column: trustedSql('krutitypekt'), display: 'KrutiTypeName' },
+  Purn: { column: trustedSql('PurnaKt'), display: 'PurnaName' },
+} as const;
+function visheshReplace(ctx: ActionContext) {
+  const kind = textParam(ctx, 'kind');
+  if (kind !== 'Ktype' && kind !== 'Purn') throw new BadRequestException('Unknown type');
+  return { kind, ...VISHESH_REPLACE[kind] };
+}
+
+const replacedMessage = (n: number) => (n > 0 ? `(${n}) Records Replaced Successfully` : undefined);
+
+/** A dd/MM/yyyy DateTimePicker value sent as yyyy-MM-dd. */
+function dateParam(ctx: ActionContext, name: string): string {
+  const v = textParam(ctx, name);
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
+  const d = m ? new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))) : null;
+  if (!d || d.toISOString().slice(0, 10) !== v) throw new BadRequestException('Invalid date');
+  return v;
+}
+
 /** The Lock By Admin / LockUnlockTransaction loop: each change is logged as "Lock". */
 async function setLockColumn(
   db: Executor,
@@ -104,30 +167,7 @@ async function setLockColumn(
     await sql`UPDATE KrutiMst SET ${col} = ${lock ? 1 : 0}, moduser = ${userId}, moddate = GETDATE() WHERE krutimstkm = ${id}`.execute(
       db,
     );
-    const prepared = await prepareWorkReport(
-      db,
-      'krutiMst',
-      'krutimstkm',
-      id,
-      userId,
-      { [column]: old },
-      { [column]: now },
-      'Lock',
-    );
-    if (prepared?.kind === 'write') {
-      await writeWorkReport(
-        db,
-        'krutiMst',
-        'krutimstkm',
-        id,
-        userId,
-        prepared.remark,
-        prepared.workTypeId,
-        prepared.mistake,
-        prepared.mistakeCount,
-        prepared.workTypeName,
-      );
-    }
+    await logChange(db, userId, id, { [column]: old }, { [column]: now }, 'Lock');
     count++;
   }
   return count;
@@ -193,8 +233,8 @@ export async function updateKrutiAuthor(
   const table = kind === 'Author1' ? trustedSql('krutiautht') : trustedSql('krutiSautht');
   if (!ids) await sql`UPDATE krutimst SET ${col} = ''`.execute(db);
   await sql`
-    UPDATE kMain SET ${col} = (SELECT ISNULL(STUFF((SELECT ',' + LTRIM(RTRIM(ISNULL(at.authtyattr, '')
-        + CASE WHEN ISNULL(at.authtyattr, '') <> '' THEN '-' ELSE '' END
+    UPDATE kMain SET ${col} = (SELECT ISNULL(STUFF((SELECT ',' + LTRIM(RTRIM(ISNULL(at.authortype, '')
+        + CASE WHEN ISNULL(at.authortype, '') <> '' THEN '-' ELSE '' END
         + CASE WHEN ISNULL(AuthMAnyNmT.AnyaName, '') = '' THEN am.authorname ELSE AuthMAnyNmT.AnyaName END
         + CASE WHEN ISNULL(am.Identyty, '') = '' THEN '' ELSE '[' + am.Identyty + ']' END
         + CASE WHEN ISNULL(VisAvastha.VisheshNo, 0) BETWEEN 1 AND 5 AND ISNULL(VisAvastha.Vishesh, '') <> '' THEN '(' + VisAvastha.Vishesh + ')' ELSE '' END))
@@ -217,7 +257,7 @@ export async function resetSamvatlessVk(db: Executor): Promise<number> {
 }
 
 export const krutiActions: Actions = {
-  // ------------------------------------------------------------ Show For Selected Kruti ----
+  // ------------------------------------------------------------ For Selected Kruti ----
   async 'book-master'(db, _user, selected) {
     // GetBookMastkmForSameGroupNo over the books the krutis refer to.
     const books = sql`SELECT b.BookMastkt FROM krutireflibno kr INNER JOIN BookT b ON kr.BookTKt = b.Tid WHERE krutimstkt IN ${toIds(selected)}`;
@@ -258,14 +298,31 @@ export const krutiActions: Actions = {
       '',
     );
   },
-  // Vibhag: the heads of every kruti the grid shows.
-  async 'vibhag-master'(db, _user, _selected, ctx) {
+  // Vibhag (v3.4.3.1): the selected krutis' KrutiVibhagT rows, no longer the dead KrutiHeadkt.
+  async 'vibhag-master'(db, _user, selected) {
     return openWhere(
       db,
       'column-master',
-      sql`SELECT DISTINCT KrutiHeadkt AS id FROM krutiMst WHERE krutimstkm IN ${toIds(idsParam(ctx, 'gridIds'))} AND KrutiHeadkt IS NOT NULL`,
-      '',
+      sql`SELECT DISTINCT VibhagKt AS id FROM KrutiVibhagT WHERE KrutimstKt IN ${toIds(selected)} AND ISNULL(VibhagKt, 0) <> 0`,
+      'No Records Found',
     );
+  },
+  // TirthRaksha Master (v3.4.3.1): frmTirthRakshaMaster with this WhereCondition; the window
+  // opens even when nothing matches (ids [0]: an empty grid).
+  async 'tirth-raksha-master'(db, _user, selected) {
+    const found = await ids(
+      db,
+      sql`SELECT DISTINCT TirthRakshaKt AS id FROM TirthRakshaReferenceT WHERE TirthRakshaReferenceT.KrutiMstKt IN ${toIds(selected)}
+          AND TirthRakshaKt IS NOT NULL
+        UNION SELECT DISTINCT TirthRakshaKt FROM TirthRakshaKrutiT WHERE TirthRakshaKrutiT.KrutiKt IN ${toIds(selected)}
+          AND TirthRakshaKt IS NOT NULL`,
+    );
+    return {
+      kind: 'open',
+      screen: 'tirth-raksha-master',
+      ids: found.length > 0 ? found : [0],
+      emptyMessage: '',
+    };
   },
   async 'party-master'(db, _user, selected) {
     return openWhere(
@@ -281,11 +338,107 @@ export const krutiActions: Actions = {
     );
     return { kind: 'refreshed', rows: [] };
   },
+  // btnAdminLock / btnAdminUnlock (v3.4.3.1): AdminLockToolStrip is shown to AMaster only. The
+  // form asks its password once per window; the web resends it and it is checked on every call.
   async 'lock-by-admin'(db, user, selected, ctx) {
+    if (user.userType !== UserType.AMaster) throw new ForbiddenException('Not allowed');
     ctx.assertPassword(ctx.params.password, ctx.env.KRUTI_LOCK_PASSWORD ?? '');
     const lock = boolParam(ctx, 'lock');
     const count = await setLockColumn(db, user.id, selected, 'LockedByAdmin', lock);
     return { kind: 'refreshed', rows: [], message: lockMessage(count, lock) };
+  },
+  /**
+   * Utility › Append Remark (v3.4.3.1): the typed text goes in front of the remark, with no
+   * separator (as the desktop, despite the name). No password, work report or moduser. Nothing
+   * is written for an empty text: the desktop's rewrite after a cancelled InputBox is a slip.
+   */
+  async 'append-remark'(db, _user, selected, ctx) {
+    const typed = textParam(ctx, 'text');
+    if (typed === '') return { kind: 'message', message: '' };
+    await sql`UPDATE KrutiMst SET remark = ${typed} + ISNULL(remark, '') WHERE krutimstkm IN ${toIds(selected)}`.execute(
+      db,
+    );
+    return { kind: 'refreshed', rows: [] };
+  },
+
+  // ------------------------------------------------------------ Replace Records (v3.4.3.1) ----
+  /**
+   * कृति परि. नाम: REPLACE(extranm, search, replace) in the selected krutis whose name holds the
+   * search text, each logged as "Modify". The texts are bound (the desktop concatenates them).
+   */
+  async 'replace-name'(db, user, selected, ctx) {
+    assertReplaceRecords(user);
+    const search = textParam(ctx, 'search');
+    const replace = textParam(ctx, 'replace');
+    if (search === '' || replace === '') return { kind: 'message', message: '' };
+    let n = 0;
+    await inTransaction(db, async (trx) => {
+      for (const id of selected) {
+        const { rows } = await sql<{ old: string | null; fresh: string | null }>`
+          SELECT extranm AS old, REPLACE(extranm, ${search}, ${replace}) AS fresh FROM krutiMst WHERE krutimstkm = ${id}`.execute(
+          trx,
+        );
+        if (rows.length === 0) continue;
+        const old = text(rows[0]!.old);
+        const fresh = text(rows[0]!.fresh);
+        if (!old.includes(search) || old.trim() === fresh.trim()) continue;
+        n++;
+        await sql`UPDATE krutimst SET extranm = REPLACE(extranm, ${search}, ${replace}) WHERE krutimstkm = ${id}`.execute(
+          trx,
+        );
+        await logChange(trx, user.id, id, { extranm: old }, { extranm: fresh }, 'Modify');
+      }
+    });
+    return { kind: 'refreshed', rows: [], message: replacedMessage(n) };
+  },
+  // FindAndReplace's first list: the types / purnata the selected krutis have.
+  async 'vishesh-of'(db, user, selected, ctx) {
+    assertReplaceRecords(user);
+    const { kind, column } = visheshReplace(ctx);
+    return excel(
+      db,
+      kind,
+      // v3.4.3.1: remark -> Vibhag once the DB is upgraded
+      sql`SELECT DISTINCT V.Tid AS Id, V.Vishesh AS Name FROM krutiMst K INNER JOIN visheshMast V ON K.${column} = V.Tid
+        WHERE K.KrutiMstKm IN ${toIds(selected)} AND ISNULL(V.Vishesh, '') <> '' AND V.remark = ${kind} ORDER BY V.Vishesh`,
+    );
+  },
+  /**
+   * प्रकार / पूर्णता (FindAndReplace): the selected krutis whose type (by its name, as the desktop
+   * compares) is the picked one get the replacement, each logged as "Modify".
+   */
+  async 'replace-vishesh'(db, user, selected, ctx) {
+    assertReplaceRecords(user);
+    const { kind, column, display } = visheshReplace(ctx);
+    const from = numberParam(ctx, 'from');
+    const to = numberParam(ctx, 'to');
+    if (from <= 0 || to <= 0) return { kind: 'message', message: '' };
+    const original = text(
+      await scalar(db, sql`SELECT Vishesh FROM visheshMast WHERE Tid = ${from}`),
+    ).trim();
+    // v3.4.3.1: remark -> Vibhag once the DB is upgraded
+    const target = await sql<{ Vishesh: string | null }>`
+      SELECT Vishesh FROM visheshMast WHERE Tid = ${to} AND ISNULL(Vishesh, '') <> '' AND remark = ${kind}`.execute(
+      db,
+    );
+    if (target.rows.length === 0) throw new BadRequestException('Unknown replacement');
+    const replacement = text(target.rows[0]!.Vishesh).trim();
+    let n = 0;
+    await inTransaction(db, async (trx) => {
+      for (const id of selected) {
+        const { rows } = await sql<{ name: string | null }>`
+          SELECT V.Vishesh AS name FROM krutiMst K LEFT JOIN visheshMast V ON K.${column} = V.Tid WHERE krutimstkm = ${id}`.execute(
+          trx,
+        );
+        if (rows.length === 0) continue;
+        const old = text(rows[0]!.name);
+        if (old.trim() !== original || old.trim() === replacement) continue;
+        n++;
+        await sql`UPDATE krutimst SET ${column} = ${to} WHERE krutimstkm = ${id}`.execute(trx);
+        await logChange(trx, user.id, id, { [display]: old }, { [display]: replacement }, 'Modify');
+      }
+    });
+    return { kind: 'refreshed', rows: [], message: replacedMessage(n) };
   },
   // Ctrl+L / Ctrl+U: LockUnlockTransaction, with the Security password.
   async 'lock-records'(db, user, selected, ctx) {
@@ -535,10 +688,55 @@ export const krutiActions: Actions = {
         WHERE krutiauthT.krutimstkt IN ${toIds(selected)} GROUP BY krutiauthT.authorcokt, authmast.authorname ORDER BY authmast.authorname`,
     );
   },
+  /**
+   * Replace In Selected › कर्ता 1 › Author (v3.4.3.1): the Security password, the swap, then
+   * krutiMst.Author rebuilt. The message counts the selected rows, as the desktop does. Both
+   * picks are needed (the desktop runs a broken UPDATE when the second list is cancelled).
+   */
   async 'replace-author'(db, _user, selected, ctx) {
-    await sql`UPDATE krutiauthT SET authorcokt = ${numberParam(ctx, 'to')} WHERE authorcokt = ${numberParam(ctx, 'from')}
-      AND krutimstkt IN ${toIds(selected)}`.execute(db);
-    return { kind: 'refreshed', rows: [] };
+    ctx.assertPassword(ctx.params.password);
+    const from = numberParam(ctx, 'from');
+    const to = numberParam(ctx, 'to');
+    if (from <= 0 || to <= 0) return { kind: 'message', message: '' };
+    await inTransaction(db, async (trx) => {
+      await sql`UPDATE krutiauthT SET authorcokt = ${to} WHERE ISNULL(authorcokt, 0) = ${from}
+        AND krutimstkt IN ${toIds(selected)}`.execute(trx);
+      await updateKrutiAuthor(trx, 'Author1', selected);
+    });
+    return {
+      kind: 'refreshed',
+      rows: [],
+      message: `(${selected.length}) Records Updated Successfully`,
+    };
+  },
+  async 'avasthas-of'(db, _user, selected) {
+    return excel(
+      db,
+      'Avastha',
+      sql`SELECT DISTINCT krutiautht.AvasthaId, visheshMast.Vishesh AS Avastha FROM krutiautht
+        INNER JOIN visheshMast ON krutiautht.avasthaid = visheshMast.Tid
+        WHERE krutiauthT.krutimstkt IN ${toIds(selected)} ORDER BY visheshMast.Vishesh`,
+    );
+  },
+  // Replace In Selected › कर्ता 1 › Avastha: as Author; the message counts the author rows changed.
+  async 'replace-avastha'(db, _user, selected, ctx) {
+    ctx.assertPassword(ctx.params.password);
+    const from = numberParam(ctx, 'from');
+    const to = numberParam(ctx, 'to');
+    if (from <= 0 || to <= 0) return { kind: 'message', message: '' };
+    let n = 0;
+    await inTransaction(db, async (trx) => {
+      n = int(
+        await scalar(
+          trx,
+          sql`SELECT COUNT(*) FROM krutiauthT WHERE ISNULL(avasthaid, 0) = ${from} AND krutimstkt IN ${toIds(selected)}`,
+        ),
+      );
+      await sql`UPDATE krutiauthT SET avasthaid = ${to} WHERE ISNULL(avasthaid, 0) = ${from}
+        AND krutimstkt IN ${toIds(selected)}`.execute(trx);
+      await updateKrutiAuthor(trx, 'Author1', selected);
+    });
+    return { kind: 'refreshed', rows: [], message: `(${n}) Records Updated Successfully` };
   },
   async 'notes-of-col'(db, _user, _selected, ctx) {
     return excel(
@@ -865,6 +1063,30 @@ export const krutiActions: Actions = {
       kind: 'list',
       rows: await ctx.list(
         sql`krutiMst.krutimstkm IN (SELECT krutimstkm FROM krutiMst WHERE Rsamvatvir > 0 AND ISNULL(samvattype, 0) = 0 AND ISNULL(rachsamvat, '') = '')`,
+      ),
+    };
+  },
+  /**
+   * Filter › Show Records By Work (v3.4.3.1, frmKrutiWorkFilter): the krutis with a work report
+   * between the two dates, of these work types / users, in these sampradays. RecordNo is
+   * nvarchar and Workdate a date, so the id is compared as text and the dates are bound as dates.
+   */
+  async 'show-by-work'(_db, _user, _selected, ctx) {
+    const from = dateParam(ctx, 'from');
+    const to = dateParam(ctx, 'to');
+    const workTypes = idsParam(ctx, 'workTypes');
+    const users = idsParam(ctx, 'users');
+    const sampradays = idsParam(ctx, 'sampradays');
+    return {
+      kind: 'list',
+      rows: await ctx.list(
+        sql`krutiMst.krutimstkm IN (SELECT DISTINCT K.krutimstkm FROM krutiMst K
+          INNER JOIN WorkReportM W ON W.RecordNo = CAST(K.krutimstkm AS nvarchar(50)) AND W.TableName = 'KrutiMst'
+          LEFT JOIN KrutiSampradayT KS ON K.krutimstkm = KS.KrutimstKt
+          WHERE W.Workdate >= CAST(${from} AS date) AND W.Workdate <= CAST(${to} AS date)
+          ${workTypes.length ? sql`AND W.WorkTypeGId IN ${idList(workTypes)}` : sql``}
+          ${users.length ? sql`AND W.DoneByGId IN ${idList(users)}` : sql``}
+          ${sampradays.length ? sql`AND KS.SampradayKt IN ${idList(sampradays)}` : sql``})`,
       ),
     };
   },

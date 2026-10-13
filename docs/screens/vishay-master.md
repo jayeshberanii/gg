@@ -24,7 +24,9 @@ Generic master engine; this screen supplies `apps/api/src/master/screens/vishay.
 
 ## Validation
 
-`"Please Enter Vishay Name"`.
+`"Please Enter Vishay Name"`, then (v3.4.3.1, add and edit) `"Vishay Name - {0} Already Exist"`
+when another subject has the same name (`SELECT COUNT(*) FROM vishay WHERE vishay_nm = … AND
+vishaycokm <> …`, checked at the top of `save`, parameterised).
 
 ## Popups (FormName "Vishay")
 
@@ -85,3 +87,16 @@ desktop deletes nothing else either).
 - `apps/api/test/master-vishay.integration.test.ts`: validation, identity add with every popup
   on the new subject (nothing on the previous one), text write-backs, anya-name edit/delete,
   references not doubled, in-use refusal message, delete, Update Vishay Count, Kruti in-use.
+
+## Desktop v3.4.3.1
+
+- **Carried over:** the duplicate-name check above. The local DB has 96 names used by more
+  than one row; those records cannot be saved again until one of them is renamed (on the
+  desktop too).
+- **Waiting for the upgraded DB:** Delete's in-use check through the procedure
+  `ListOrReplaceRecordInUse` (message "Record is in use", title "Record cannot be deleted") and
+  the new right-click item "Replace In Use Current Vishay With Another Vishay" (same procedure,
+  plus the 3-parameter `UpdateVishay`). Neither exists in the current DB, so Delete still uses
+  the three inline queries and the old message.
+- Not fixed on the desktop: MAX-before-identity and references re-inserted on every save (the
+  web's fixes stand).

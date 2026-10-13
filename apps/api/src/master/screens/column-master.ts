@@ -1,5 +1,5 @@
 import { UserType } from '@gglib/shared';
-import { ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { sql } from 'kysely';
 import { type Executor, idList } from '../../db/legacy-sql.js';
 import { pickListOf } from '../values.js';
@@ -81,6 +81,13 @@ export const columnMaster: ScreenDefinition = {
   },
 
   async save(trx, user, id, f) {
+    // v3.4.3.1 Save: another record has the same Name and Vibhag (message as the desktop has it).
+    const { rows: same } = await sql<{ n: number }>`
+      SELECT COUNT(*) AS n FROM columnmaster
+      WHERE ColumnMastkm <> ${id} AND Name = ${trimmed(f.Name)} AND Vibhag = ${trimmed(f.Vibhag)}
+    `.execute(trx);
+    if (Number(same[0]?.n ?? 0) > 0) throw new BadRequestException('Recor Already Exist');
+
     const v = {
       Name: insq(f.Name),
       ColumnNo: int(f.ColumnNo),

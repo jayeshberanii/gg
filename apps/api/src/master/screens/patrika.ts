@@ -258,13 +258,23 @@ export const patrika: ScreenDefinition = {
     },
 
     /** For Selected Record › Utility › Request For LabIssue (For party 0, Type Patrika). */
-    async 'request-lab-issue'(db, user, ids): Promise<ActionResult> {
+    async 'request-lab-issue'(db, user, ids, ctx): Promise<ActionResult> {
       const { rows } = await sql<{ id: number; RecordNo: string | null }>`
         SELECT PatrikaKm AS id, RecordNo FROM Patrika WHERE PatrikaKm IN ${idList(ids.length ? ids : [0])}
       `.execute(db);
       const byId = new Map(rows.map((r) => [Number(r.id), text(r.RecordNo)]));
       const items = ids.filter((id) => byId.has(id)).map((id) => ({ id, name: byId.get(id)! }));
-      return { kind: 'message', message: await requestLabIssue(db, user.id, items, 0, 'Patrika') };
+      return {
+        kind: 'message',
+        message: await requestLabIssue(
+          db,
+          user.id,
+          items,
+          0,
+          'Patrika',
+          ctx.env.LAB_ISSUE_OLD_DUE_BLOCK,
+        ),
+      };
     },
   },
 };

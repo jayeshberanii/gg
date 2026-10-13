@@ -125,7 +125,7 @@ describe.skipIf(!hasDb)(
         sql`SELECT TOP 1 authorcokm AS id FROM authmast WHERE ISNULL(authorname, '') <> '' ORDER BY authorcokm`,
       );
       authTypeKt = await first(
-        sql`SELECT TOP 1 authtycokm AS id FROM authtype WHERE ISNULL(authtyattr, '') <> '' ORDER BY authtycokm`,
+        sql`SELECT TOP 1 authtycokm AS id FROM authtype WHERE ISNULL(authortype, '') <> '' AND ISNULL(authtyattr, '') <> authortype ORDER BY authtycokm`,
       );
       swaroopKt = await first(
         sql`SELECT TOP 1 ColumnMastkm AS id FROM columnmaster WHERE Vibhag = N'Swroop' AND ISNULL(Name, '') <> ''`,
@@ -507,6 +507,13 @@ describe.skipIf(!hasDb)(
       );
       expect(k.Pariman).toBe('Sub PT 100,Pr 12');
       expect(String(k.Author)).not.toBe('');
+      // v3.4.3.1: UpdateKrutiAuthor names the type by authtype.authortype, not its attribute.
+      const typeName = (
+        await one(
+          sql<{ t: string }>`SELECT authortype AS t FROM authtype WHERE authtycokm = ${authTypeKt}`,
+        )
+      ).t.trim();
+      expect(String(k.Author).startsWith(`${typeName}-`)).toBe(true);
       expect(String(k.SAuthor)).not.toBe('');
       const n = (t: string) =>
         count(
@@ -694,7 +701,33 @@ describe.skipIf(!hasDb)(
       });
       const refused = await op.post(`${API}/delete`).send({ ids: [b.id], password: SECURITY });
       expect(refused.status).toBe(409);
-      expect(refused.body.message).toBe('Records in used anthor plase !');
+      expect(refused.body.message).toBe(`\r\nKrutiMstKm - ${b.id} is used in वि.क्र.`);
+      // v3.4.3.1: a kruti Tirth Raksha uses is refused too, every reason in the one message.
+      const tirth = await first(sql`SELECT TOP 1 TirthRakshaKm AS id FROM TirthRakshaM`);
+      await sql`INSERT INTO TirthRakshaKrutiT (TirthRakshaKt, KrutiKt, Seq) VALUES (${tirth}, ${b.id}, 1)`.execute(
+        trx,
+      );
+      const both = await op.post(`${API}/delete`).send({ ids: [b.id], password: SECURITY });
+      expect(both.status).toBe(409);
+      expect(both.body.message).toBe(
+        `\r\nKrutiMstKm - ${b.id} is used in TirthRaksha Master\r\nKrutiMstKm - ${b.id} is used in वि.क्र.`,
+      );
+      await sql`DELETE FROM TirthRakshaKrutiT WHERE KrutiKt = ${b.id}`.execute(trx);
+      await sql`INSERT INTO TirthRakshaReferenceT (TirthRakshaKt, KrutiMstKt, Seq) VALUES (${tirth}, ${a.id}, 1)`.execute(
+        trx,
+      );
+      const ref = await op.post(`${API}/delete`).send({ ids: [a.id], password: SECURITY });
+      expect(ref.body.message).toBe(`\r\nKrutiMstKm - ${a.id} is used in TirthRaksha Master`);
+      // For Selected Kruti › TirthRaksha Master: the UNION of both tables.
+      expect((await action(op, 'tirth-raksha-master', [a.id])).body).toEqual({
+        kind: 'open',
+        screen: 'tirth-raksha-master',
+        ids: [tirth],
+        emptyMessage: '',
+      });
+      await sql`DELETE FROM TirthRakshaReferenceT WHERE KrutiMstKt = ${a.id}`.execute(trx);
+      // Nothing uses it: the window still opens, on an empty grid.
+      expect((await action(op, 'tirth-raksha-master', [a.id])).body).toMatchObject({ ids: [0] });
       // a heads a group with b: refused while b is a member.
       expect(
         (await action(op, 'group-add-new', [a.id, b.id], { head: a.id, name: 'G' })).status,
@@ -729,11 +762,16 @@ describe.skipIf(!hasDb)(
       const b = await addKruti({ extranm: 'Second' });
       const ids = [a.id, b.id];
 
-      // Lock By Admin needs the form's own password; Ctrl+L the Security one.
+      // Lock By Admin (v3.4.3.1): AMaster only, with the form's own password on every call;
+      // Ctrl+L the Security one.
+      const amaster = await login(5, false);
       expect(
-        (await action(admin, 'lock-by-admin', ids, { lock: true, password: SECURITY })).status,
+        (await action(admin, 'lock-by-admin', ids, { lock: true, password: KRUTI_LOCK })).status,
+      ).toBe(403);
+      expect(
+        (await action(amaster, 'lock-by-admin', ids, { lock: true, password: SECURITY })).status,
       ).toBe(401);
-      const locked = await action(admin, 'lock-by-admin', ids, {
+      const locked = await action(amaster, 'lock-by-admin', ids, {
         lock: true,
         password: KRUTI_LOCK,
       });
@@ -817,6 +855,227 @@ describe.skipIf(!hasDb)(
       const record = (await op.get(`${API}/record/${b.id}`)).body as GridRow;
       expect(record.groupnm).toMatch(/^\(\d+\)NewHead$/);
       expect(record.GroupDisabled).toBe(false);
+    });
+
+    it('runs the v3.4.3.1 menu items', async () => {
+      const a = await addKruti({
+        extranm: 'Alpha Kruti',
+        remark: 'old',
+        'VibhagTran.Rows': [
+          { krutimstkt: 0, KrutiVibhagKm: 0, VibhagKt: vibhagKt, VibhagName: 'v', seq: 1 },
+        ],
+        'SampradayTran.Rows': [
+          {
+            krutimstkt: 0,
+            KrutiSampradayKm: 0,
+            SampradayKt: sampradayKt,
+            SampradayName: 's',
+            seq: 1,
+          },
+        ],
+      });
+      const b = await addKruti({ extranm: 'Beta' });
+      const ids = [a.id, b.id];
+      const body = async (r: request.Test) => (await r).body as ActionResult & { message?: string };
+
+      // The grid's new Sampraday and Remark columns come with the list rows.
+      const listed = (await op.post(`${API}/list`).send({ ids: [a.id] })).body as GridRow[];
+      expect(listed[0]).toHaveProperty('SampradayTran');
+      expect(String(listed[0]!.SampradayTran)).not.toBe('');
+      expect(listed[0]!.remark).toBe('old');
+
+      // Vibhag: KrutiVibhagT of the selected rows; none, "No Records Found".
+      expect(await body(action(op, 'vibhag-master', [a.id]))).toEqual({
+        kind: 'open',
+        screen: 'column-master',
+        ids: [vibhagKt],
+        emptyMessage: 'No Records Found',
+      });
+      expect(await body(action(op, 'vibhag-master', [b.id]))).toMatchObject({
+        ids: [],
+        emptyMessage: 'No Records Found',
+      });
+
+      // Append Remark: in front, no separator; nothing for an empty text.
+      await action(op, 'append-remark', ids, { text: '' });
+      await action(op, 'append-remark', ids, { text: "N'x " });
+      const remarks = (
+        await sql<{ remark: string | null }>`
+          SELECT remark FROM krutiMst WHERE krutimstkm IN (${a.id}, ${b.id}) ORDER BY krutimstkm`.execute(
+          trx,
+        )
+      ).rows.map((r) => r.remark);
+      expect(remarks).toEqual(["N'x old", "N'x "]);
+
+      // Replace Records: Admin / AMaster only.
+      for (const [name, params] of [
+        ['replace-name', { search: 'Alpha', replace: 'Omega' }],
+        ['vishesh-of', { kind: 'Ktype' }],
+        ['replace-vishesh', { kind: 'Ktype', from: 1, to: 1 }],
+      ] as const)
+        expect((await action(op, name, ids, params)).status, name).toBe(403);
+      // कृति परि. नाम: only names holding the text; the texts are bound, quotes and all.
+      const reports = () =>
+        count(sql<{ n: number }>`
+          SELECT COUNT(*) AS n FROM WorkReportM W INNER JOIN columnmaster C ON W.WorkTypeGId = C.ColumnMastkm
+          WHERE W.TableName = 'krutiMst' AND W.RecordNo IN (${String(a.id)}, ${String(b.id)}) AND C.Name = 'Modify'`);
+      const before = await reports();
+      const renamed = await body(
+        action(admin, 'replace-name', ids, { search: 'Alpha', replace: "O'mega" }),
+      );
+      expect(renamed).toMatchObject({
+        kind: 'refreshed',
+        message: '(1) Records Replaced Successfully',
+      });
+      expect(
+        (
+          await one(
+            sql<{ n: string }>`SELECT extranm AS n FROM krutiMst WHERE krutimstkm = ${a.id}`,
+          )
+        ).n,
+      ).toBe("O'mega Kruti");
+      expect(await reports()).toBe(before + 1);
+      const none = await body(action(admin, 'replace-name', ids, { search: 'Zzz', replace: 'Y' }));
+      expect(none.message).toBeUndefined();
+
+      // प्रकार: two types of the category; a is of the first, b of none.
+      const types = (
+        await sql<{ id: number; name: string }>`
+          SELECT TOP 2 Tid AS id, Vishesh AS name FROM visheshMast WHERE remark = 'Ktype' AND ISNULL(Vishesh, '') <> ''
+          ORDER BY Vishesh`.execute(trx)
+      ).rows;
+      await sql`UPDATE krutiMst SET krutitypekt = ${types[0]!.id} WHERE krutimstkm = ${a.id}`.execute(
+        trx,
+      );
+      const originals = (await body(action(admin, 'vishesh-of', ids, { kind: 'Ktype' }))) as {
+        rows: unknown[][];
+      };
+      expect(originals.rows).toEqual([[types[0]!.id, types[0]!.name]]);
+      const typed = await body(
+        action(admin, 'replace-vishesh', ids, {
+          kind: 'Ktype',
+          from: types[0]!.id,
+          to: types[1]!.id,
+        }),
+      );
+      expect(typed.message).toBe('(1) Records Replaced Successfully');
+      expect(
+        (
+          await one(
+            sql<{ n: number }>`SELECT krutitypekt AS n FROM krutiMst WHERE krutimstkm = ${a.id}`,
+          )
+        ).n,
+      ).toBe(types[1]!.id);
+      // The day's report of the record is the one row: the type change joins the rename in it.
+      expect(await reports()).toBe(before + 1);
+      const logged = await one(sql<{ Mistake: string; Remark: string }>`
+        SELECT Mistake, Remark FROM WorkReportM WHERE TableName = 'krutiMst' AND RecordNo = ${String(a.id)}
+          AND Workdate = CAST(GETDATE() AS date) AND Remark LIKE '%KrutiTypeName(%'`);
+      expect(logged.Mistake).toContain('extranm(Alpha Kruti)');
+      expect(logged.Remark).toContain("extranm(O'mega Kruti)");
+      expect(logged.Remark).toContain(`KrutiTypeName(${types[1]!.name.trim()})`);
+      // A replacement outside the category is refused.
+      const purn = await first(sql`SELECT TOP 1 Tid AS id FROM visheshMast WHERE remark = 'Purn'`);
+      expect(
+        (
+          await action(admin, 'replace-vishesh', ids, {
+            kind: 'Ktype',
+            from: types[1]!.id,
+            to: purn,
+          })
+        ).status,
+      ).toBe(400);
+      const replaceList = (await op.get(`${API}/lists/replace-purn`)).body as PickList;
+      expect(replaceList.rows.some((r) => r[0] === purn)).toBe(true);
+
+      // Replace In Selected › कर्ता 1: password, both picks, Author rebuilt.
+      const [fromAuthor, toAuthor] = (
+        await sql<{ id: number; name: string }>`
+          SELECT TOP 2 authorcokm AS id, authorname AS name FROM authmast WHERE ISNULL(authorname, '') <> ''
+            AND ISNULL(Identyty, '') = '' ORDER BY authorcokm`.execute(trx)
+      ).rows;
+      const avasthas = (
+        await sql<{ id: number; name: string }>`
+          SELECT TOP 2 Tid AS id, Vishesh AS name FROM visheshMast WHERE remark = 'Avastha' AND ISNULL(VisheshNo, 0) BETWEEN 1 AND 5
+            AND ISNULL(Vishesh, '') <> '' ORDER BY Tid`.execute(trx)
+      ).rows;
+      await sql`INSERT INTO krutiauthT (krutauthkm, krutimstkt, authorcokt, authtycokt, avasthaid, seq)
+        VALUES ((SELECT ISNULL(MAX(krutauthkm), 0) + 1 FROM krutiauthT), ${a.id}, ${fromAuthor!.id}, 0, ${avasthas[0]!.id}, 1)`.execute(
+        trx,
+      );
+      expect((await action(op, 'replace-author', ids, { from: 1, to: 2 })).status).toBe(401);
+      const noPick = await body(
+        action(op, 'replace-author', ids, { from: fromAuthor!.id, to: 0, password: SECURITY }),
+      );
+      expect(noPick).toEqual({ kind: 'message', message: '' });
+      const swapped = await body(
+        action(op, 'replace-author', ids, {
+          from: fromAuthor!.id,
+          to: toAuthor!.id,
+          password: SECURITY,
+        }),
+      );
+      // The desktop's count is the selected rows'.
+      expect(swapped).toMatchObject({
+        kind: 'refreshed',
+        message: '(2) Records Updated Successfully',
+      });
+      const authorText = async () =>
+        (await one(sql<{ t: string }>`SELECT Author AS t FROM krutiMst WHERE krutimstkm = ${a.id}`))
+          .t;
+      expect(await authorText()).toBe(`${toAuthor!.name}(${avasthas[0]!.name})`);
+      expect(swapped.kind === 'refreshed' && swapped.rows.map((r) => r.krutimstkm).sort()).toEqual(
+        [...ids].sort(),
+      );
+      const sources = (await body(action(op, 'avasthas-of', ids))) as { rows: unknown[][] };
+      expect(sources.rows).toEqual([[avasthas[0]!.id, avasthas[0]!.name]]);
+      const avasthaList = (await op.get(`${API}/lists/avasthas`)).body as PickList;
+      expect(avasthaList.rows.some((r) => r[0] === avasthas[1]!.id)).toBe(true);
+      const aged = await body(
+        action(op, 'replace-avastha', ids, {
+          from: avasthas[0]!.id,
+          to: avasthas[1]!.id,
+          password: SECURITY,
+        }),
+      );
+      expect(aged.message).toBe('(1) Records Updated Successfully');
+      expect(await authorText()).toBe(`${toAuthor!.name}(${avasthas[1]!.name})`);
+
+      // Filter › Show Records By Work: today's work reports of these krutis (a has Modify ones).
+      const today = (await one(sql<{ d: string }>`SELECT CONVERT(char(10), GETDATE(), 23) AS d`)).d;
+      const modify = await first(
+        sql`SELECT TOP 1 ColumnMastkm AS id FROM columnmaster WHERE Vibhag = 'WorkType' AND Name = 'Modify'`,
+      );
+      const adminId = await first(sql`SELECT MAX(tid) AS id FROM Usecurity`);
+      const byWork = async (params: Record<string, unknown>) =>
+        (
+          (await body(action(op, 'show-by-work', [], { from: today, to: today, ...params }))) as {
+            rows: GridRow[];
+          }
+        ).rows.map((r) => r.krutimstkm);
+      expect(await byWork({ workTypes: String(modify), users: String(adminId) })).toEqual([a.id]);
+      expect(
+        await byWork({
+          workTypes: String(modify),
+          users: String(adminId),
+          sampradays: String(sampradayKt),
+        }),
+      ).toEqual([a.id]);
+      // The operator only added them: no Modify report of theirs.
+      const opId = await first(sql`SELECT MAX(tid) AS id FROM Usecurity WHERE tid < ${adminId}`);
+      expect(await byWork({ workTypes: String(modify), users: String(opId) })).toEqual([]);
+      expect((await byWork({ users: String(opId) })).sort()).toEqual([...ids].sort());
+      expect((await action(op, 'show-by-work', [], { from: "1'; DROP", to: today })).status).toBe(
+        400,
+      );
+      for (const name of ['work-types', 'work-users'])
+        expect(
+          ((await op.get(`${API}/lists/${name}`)).body as PickList).rows.length,
+        ).toBeGreaterThan(0);
+
+      // Main Report With Reference: the seven "आदि लीस्ट" sampradays.
+      const akaradi = (await op.get(`${API}/lists/kruti-sampraday-akaradi`)).body as PickList;
+      expect(akaradi.rows).toHaveLength(7);
     });
 
     it("prints a Kruti layout with the joined Pariman column, and lists the popups' cells", async () => {

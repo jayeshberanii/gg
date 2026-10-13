@@ -72,7 +72,8 @@ local popup (`AuthorName`: the name's reference book and page).
 | AuthUnavailKrutiTran                                           | AuthUnavailKrutiT                                      | delete + insert, key max+1                        |
 | AuthorNoteTran / AuthorNote2Tran                               | AuthorNoteT / AuthorNoteT2                             | delete + insert                                   |
 | AuthorRefLibnoTran                                             | AuthorRefLibno (`reflibno` = LibNo, `lipi` = lipiname) | delete + insert                                   |
-| AuthorIdentityTran, AuthorGuruTran, SamvatTran                 | AuthorIdentityT, AuthorGuruT, AuthorSamvatT            | delete + insert                                   |
+| AuthorIdentityTran, AuthorGuruTran                             | AuthorIdentityT, AuthorGuruT                           | delete + insert                                   |
+| SamvatTran                                                     | AuthorSamvatT                                          | upsert by `AuthorSamvatKm` + prune (v3.4.3.1)     |
 | AuthorPattavaliTran, SampradayTran, AnyaYogdanTran, ParyayTran | …                                                      | upsert by id + prune                              |
 | AddressTran                                                    | PrakMAddT (`AuthorcoKt`)                               | only when its text changed from the loaded record |
 | KrutiTran                                                      | the author's Kruti names                               | not saved (a read-only list)                      |
@@ -127,10 +128,43 @@ Delete author not in use, Update ASamvatVK in Entrmast (`Visible = False`, no ha
 - New rows' temporary ids are unique negatives (the desktop draws random -500..-1, which can
   collide and mix two new any names' books).
 - Update Count shows its message once, not once per author.
-- The Sampraday upsert prunes against its own ids only (the desktop's list also carried AnyName2 ids).
+- **Samvat save, `RefSamvatKt`** (v3.4.3.1). When Samvat rows are removed, the desktop runs
+  `UPDATE authmast SET RefSamvatKt=NULL FROM authmast INNER JOIN AuthorSamvatT ON
+authorcokm=AuthorKt WHERE AuthorKt=<id> AND AuthorSamvatKm NOT IN(<kept>)`: it clears **this
+  author's** reference whenever any of its rows is removed, even when the referenced row stays,
+  and leaves other authors pointing at a removed row. The web clears `RefSamvatKt` exactly
+  where it points at a row being removed — for any author — and nowhere else.
+- Samvat rows: a row whose `AuthorSamvatKm` is not one of this author's rows is inserted as
+  new (the desktop would UPDATE whichever row has that key, another author's included).
 - Print Books for Selected Author works for several authors (the desktop's SQL lacked the `OR`s).
 - Copy/Paste Grid keep the copy in the browser, not in `TempGrid<user>` tables; Paste Grid pastes
   after the current row (the desktop forced row 1).
+
+## Desktop v3.4.3.1
+
+Carried over:
+
+- **Samvat rows are upserted** by `AuthorSamvatKm` (insert for key 0, update otherwise, then
+  prune) instead of delete + insert, so the keys `authmast.RefSamvatKt` stores survive a save.
+  See the two deliberate differences above. The row-by-row Samvat work report is unchanged (it
+  compares the popup's rows before the save with the rows sent).
+- **Sampraday box text**: `SampradayName(Remark)` per row — the old code repeated the name in
+  the brackets (`transSummary.ts` `sampradaySummary`). This is what `txtSampraday` stores.
+- **The Sampraday id box** (`Sampradaykt`, beside the Sampraday popup box) is disabled
+  (`alwaysDisabled`); its value is still loaded and sent.
+- **Show In Use (For Selected Record) › BookT**: the Library No dialog (`BookTranDialog`) over
+  the BookT ids of the desktop's UNION query for the selected grid rows — the name's reference
+  book, the Guru parampara rows (first kind present among गुरु, विद्यागुरु, गुरुपरंपरा), AnyName2
+  books, Sampraday books and printed Samvat rows (action `in-use-book-t`). Like the desktop it
+  shows no message and opens empty when nothing matches.
+- **Now the same as the desktop** (they were web-only fixes before): Pattavali rows are upserted
+  with no prior delete, and the Sampraday prune list holds only Sampraday ids.
+
+Waiting for the upgraded database (not built): the Patrika reference in the Name popup
+(`authmast.AuthorNameRefPatrikaKt`), Print Report › Author Check Report (procedure
+`PrintAuthorCheckReport`), and Print Author Info's new SQL (same missing column; the item is
+commented out in the web menu anyway). Show Image of RefrenceT now reads its path from
+`GeneralConfig` on the desktop — not available on the web.
 
 ## Not available on the web
 
@@ -142,7 +176,8 @@ Delete author not in use, Update ASamvatVK in Entrmast (`Visible = False`, no ha
 
 ## Verified
 
-- `apps/api/test/master-author.integration.test.ts` (8 tests, real DB, rolled back): validation,
+- `apps/api/test/master-author.integration.test.ts` (10 tests, real DB, rolled back): Samvat
+  upsert and `RefSamvatKt`, Show In Use › BookT, validation,
   popups and lists, add with 9 popups (non-identity keys, AnyName books, Samvat derivation, New work
   report), edit (unopened popups untouched, rename cascade, Modify work report), in-use delete and
   delete log, the menu actions, F1 admin rule.

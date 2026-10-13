@@ -97,7 +97,7 @@ export const labIssueMaster: ScreenDefinition = {
    * GetUserNotReturnedBook, then LabIssueMRepository.Save. Add inserts a Book request (status
    * DlvrPen); Edit changes only BookTKt and Forkt, stamping moduserKt (the desktop wrote 0).
    */
-  async save(trx, user, id, fields) {
+  async save(trx, user, id, fields, { env }) {
     const bookTKt = int(fields.BookTKt);
     const forKt = int(fields.Forkt);
     let name: string;
@@ -114,7 +114,7 @@ export const labIssueMaster: ScreenDefinition = {
     }
     const problem =
       (await labIssueValidation(trx, { id, bookTKt, name, type: '' })) ||
-      (await userNotReturnedBook(trx, user.id, forKt));
+      (await userNotReturnedBook(trx, user.id, forKt, env.LAB_ISSUE_OLD_DUE_BLOCK));
     if (problem) throw new BadRequestException(problem);
     if (id === 0) return insertLabRequest(trx, { bookTKt, userId: user.id, forKt, type: 'Book' });
     await sql`
@@ -218,7 +218,12 @@ export const labIssueMaster: ScreenDefinition = {
       const party = int(ctx.params.party);
       if (ctx.params.party === undefined) return message('ask-party');
       if (party <= 0) return message('');
-      const problem = await userNotReturnedBook(db, user.id, party);
+      const problem = await userNotReturnedBook(
+        db,
+        user.id,
+        party,
+        ctx.env.LAB_ISSUE_OLD_DUE_BLOCK,
+      );
       if (problem) return message(problem);
       await sql`
         UPDATE LabIssueM SET Forkt = ${party}, moduserKt = ${user.id}, moddate = GETDATE()

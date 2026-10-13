@@ -76,14 +76,15 @@ panel); the check boxes stay clickable (only TextBoxes are made read-only).
 ## Delete
 
 "You can not delete Group's Master Record First Remove Group Member" while other krutis share its
-group; "Delete the Kruti No n Kruti Name :- x? ", the Security password; "Records in used anthor
-plase !" while it has an up level (`krutiRelT`). The work report says `DEL-<name>`.
+group; "Delete the Kruti No n Kruti Name :- x? ", the Security password; then every use that
+stops it, in one message (v3.4.3.1, see below). The work report says `DEL-<name>`.
 
 ## Right-click menu (cntMenu)
 
-Ported item for item. Print Report is shown only to Admin / AMaster and user ids 22, 29, 54, 64,
-38, 182; Lock / Unlock By Admin only to admins and AMaster, with the form's own password
-(`KRUTI_LOCK_PASSWORD`). Ctrl+L / Ctrl+U (the hidden Lock Selected Kruti items) use the Security
+Ported item for item (items the user commented out in `KrutiMaster.tsx` stay out). Print Report
+is shown only to Admin / AMaster and user ids 22, 29, 54, 64, 38, 182. Lock / Unlock By Admin are
+panel buttons since v3.4.3.1 (below), with the form's own password (`KRUTI_LOCK_PASSWORD`).
+Ctrl+L / Ctrl+U (the hidden Lock Selected Kruti items) use the Security
 password (`LockUnlockTransaction`). Ctrl+9 is Insert Ref Library No, Ctrl+T Toggle MultiSelect.
 Report pages are built by the API and shown in the web's report window (see `reports.md`);
 tables the desktop sends to Excel download as CSV.
@@ -97,8 +98,8 @@ tables the desktop sends to Excel download as CSV.
   old key and its own clean-up deleted them. A kruti whose titles are only partly named saves (the
   desktop failed with "The source contains no DataRows").
 - Editing leaves `KrutiHeadkt` alone. The desktop writes `Val(txtVibhagTran.Tag)`, a Tag nothing
-  sets, so every desktop edit zeroes it (915 krutis still have one; the Vibhag and Update Kruti
-  Swarop Head menu items read it).
+  sets, so every desktop edit zeroes it (915 krutis still have one; the Update Kruti Swarop Head
+  menu item reads it; Vibhag did until v3.4.3.1).
 - Blank popup rows (no id picked) are not inserted.
 - Delete removes every child table, including second authors, sub pariman, vibhag, sampraday and
   subjects, which the desktop left behind.
@@ -127,3 +128,91 @@ tables the desktop sends to Excel download as CSV.
 
 - `apps/api/test/master-kruti.integration.test.ts` (real DB, rolled back).
 - `apps/web/e2e/kruti-master.spec.ts`.
+
+## Desktop v3.4.3.1
+
+- **Author-type text (Master batch).** `UpdateKrutiAuthor` (`frmKrutiMasterNew.vb:960`,
+  `updateKrutiAuthor` in `kruti-actions.ts`) builds `Author` / `SAuthor` from the type's name,
+  `authtype.authortype`, instead of `authtyattr`.
+
+Kruti batch (source: `GGLibrarySolutionUpdated/Library/Library/frmKrutiMasterNew.vb`,
+`.designer.vb`, `frmKrutiWorkFilter.vb` + Designer; inventory
+`docs/desktop-update-3.4.3.1/4-kruti.md`). The database is still the v3.3.3.6 one.
+
+- **Grid.** The `कर्ता2` (`SAuthor`) column is gone; `Sampraday` (`SampradayTran`, 200) and
+  `Remark` (100) follow `PNo`. This database's tblSearch rows for them (722, 701) exist but are
+  not `DisplayInGrid`, so the screen adds them to its grid query itself
+  (`ScreenDefinition.gridColumnsAlso`, new, opt-in); `remark` is selected as `krutiMst.remark`
+  because the form's join has `visheshMast` aliases with a `remark` of their own. Once tblSearch
+  flags the rows the option does nothing.
+- **Delete.** After the password: `KrutiMstKm - <id> is used in TirthRaksha Master`
+  (`TirthRakshaKrutiT.KrutiKt` or `TirthRakshaReferenceT.KrutiMstKt`) and
+  `KrutiMstKm - <id> is used in वि.क्र.` (`krutiRelT`), each on its own line (a line break
+  before each, as the desktop builds it), in one message. "Records in used anthor plase !" is
+  gone.
+- **Menu.** `Show For Selected  Kruti ` is now `For Selected  Kruti `. New in it:
+  - `TirthRaksha Master`: opens Tirth Raksha Master on the records that refer to the selected
+    krutis (`TirthRakshaReferenceT` UNION `TirthRakshaKrutiT`); with none, an empty window, as
+    the desktop.
+  - `Vibhag` reads `KrutiVibhagT` of the **selected** rows (was `KrutiHeadkt` of every grid
+    row); none: `No Records Found`.
+  - `Utility › Append Remark`: the typed text is put **in front** of the remark with no
+    separator (as the desktop, despite the name). No password, work report or `moduser`.
+  - `Replace Records` (IsAdmin or AMaster; the API refuses everyone else):
+    `कृति परि. नाम` (`Enter Existing Text` / `Enter New Replace Text`, `REPLACE(extranm, …)`
+    where the name holds the text), `प्रकार` and `पूर्णता` (`FindAndReplace`: the type to
+    replace among the selected krutis', then the new one; rows are matched by the type's
+    **name**, as the desktop compares). Each changed kruti gets a `Modify` work report;
+    `(n) Records Replaced Successfully`. `moduser` / `moddate` are not touched, as there.
+  - `Utility › Replace In Selected › कर्ता 1 › Author / Avastha` (was the item `Author`): the
+    Security password first, the swap in `krutiauthT`, then `UpdateKrutiAuthor("Author1", …)`,
+    then `(n) Records Updated Successfully` — n is the number of **selected rows** for Author and
+    the number of author rows that had the old avastha for Avastha, as the desktop computes them.
+  - `Filter › Show Records By Work` (new top-level item): the Kruti Work Filter dialog
+    (`KrutiWorkFilterDialog.tsx`, the Designer's 583x147 layout, Times New Roman 14.25): two
+    dates starting on today, and `Work Type`, `Sampraday` (any key opens the list) and
+    `Work Done By` (F2) filled from multi-select lists (names joined by `,`; picking the list's
+    blank row empties a box). Search (its tooltip is "Save" on the desktop) lists the krutis with
+    a `WorkReportM` row (`TableName = 'KrutiMst'`) between the dates, of those types / users, in
+    those sampradays; the list stays until Refresh. `RecordNo` is nvarchar, so the kruti id is
+    compared as text; the dates are bound as dates.
+  - `Main Report With Reference`: the "Yes" list has the seven `… आदि लीस्ट` sampradays.
+- **Lock / Unlock By Admin.** The two menu items are gone. `AdminLockToolStrip` (668, 304;
+  64x25, the desktop's `lock` / `lock-open` icons in `public/legacy/icons/`) sits in the panel for
+  **AMaster only** (`MasterScreen`'s new `inPanel`). A click asks
+  `Are You Sure To Lock Selected Records?` / `… Unlock …`, then the password only until one run
+  got through in that window. The web keeps the typed password for the window and sends it
+  again; the API checks it on every call and refuses users who are not AMaster.
+- **visheshMast.** New SQL ported from statements that say `Vibhag` on the updated desktop
+  (Avastha list, Replace Records) uses `remark` here, marked
+  `// v3.4.3.1: remark -> Vibhag once the DB is upgraded`.
+
+Deliberate differences (v3.4.3.1):
+
+- Append Remark does nothing when the input is cancelled or empty (the desktop then rewrites
+  every selected remark with its own grid value), and it reads the remark from the database, not
+  from the grid cell.
+- Replace In Selected › Author / Avastha need both picks (the desktop runs
+  `set authorcokt = where …` when the second list is cancelled and shows the SQL error), and the
+  affected grid rows are refreshed afterwards (the desktop leaves कर्ता1 stale; the old web
+  reloaded the whole list).
+- Replace Records binds the search / replace texts as parameters (the desktop concatenates them,
+  so a `'` breaks its statement); a replacement type outside the category is refused.
+- Lock / Unlock By Admin and Replace Records are enforced by the API, not only hidden.
+- Ctrl+N / Ctrl+S: the updated desktop guards them with `btnAdminLock.Enabled` /
+  `btnAdminUnlock.Enabled` (buttons copied from New / Save and never disabled), so they fire
+  whatever the toolbar's state. A slip; the web keeps following New / Save.
+- The filter dialog's dates are the browser's date boxes (dd/MM/yyyy on en-IN systems), as every
+  DateTimePicker on the web; Tab, Esc and a bare modifier key do not open a box's list.
+
+Not done (v3.4.3.1), waiting for the upgraded database:
+
+- The right-click menu's per-user permissions (`ContextMenu`, `UserContextMenuPermission` are
+  missing): `PRINT_USER_IDS` still decides Print Report.
+- The Sampraday popup's `ISCompleted` filter (`columnmaster.IsCompleted` is missing).
+- `Utility › Mark Samprad As Complete`: its handler is empty on the desktop; left out.
+- `visheshMast.remark` → `Vibhag`, and the tblSearch flags for the two new grid columns.
+
+Tests: `master-kruti.integration.test.ts` ("runs the v3.4.3.1 menu items", the delete test, the
+lock test) and `e2e/kruti-master.spec.ts` (two v3.4.3.1 tests; the e2e scenario has an `amaster`
+user and `KRUTI_LOCK_PASSWORD`).

@@ -173,7 +173,7 @@ export function PartyMaster(props: ScreenProps) {
                   await a.run('send-to-issue', { mode });
                 },
               },
-              send('Inword', 'send-to-inward'),
+              send('Inward', 'send-to-inward'),
               // send('WorkGiven', 'send-to-work-given'),
               // Its handler is commented out on the desktop.
               // { kind: 'item', label: 'Catalogue', disabled: true, onSelect: () => undefined },

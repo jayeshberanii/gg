@@ -151,6 +151,15 @@ export type ScreenDefinition = {
   /** The form builds its grid query with UcSearch.GetColumns rather than GetDataTable. */
   ucSearchColumns?: boolean;
   /**
+   * tblSearch columns the form's grid binds although this database's tblSearch does not mark
+   * them DisplayInGrid yet (desktop v3.4.3.1's Kruti grid binds SampradayTran and remark; the
+   * flags come with the upgraded data). They are listed after the flagged columns; a column
+   * tblSearch already flags is left as it is, so the option is inert on an upgraded database.
+   * `select`: the grid query's expression for it, a constant of the screen (default: the row's
+   * JoinCondition, else the bare column).
+   */
+  gridColumnsAlso?: { column: string; select?: string }[];
+  /**
    * Config_Master.ConfigType of the layouts the right-click Print Report menu lists (Form_Load's
    * dtConfig), when the form reads another type than the picker's TransactionName (Kruti Master
    * reads 'Kruti'; its picker saves under 'KrutiMst').
@@ -208,8 +217,11 @@ export type ScreenDefinition = {
   /**
    * A condition every list and record of this user's is restricted to (the form's
    * DefaultCondition, e.g. Book Master hides CM/MS/CP/SN library numbers from Operators).
+   * `params` are the form's switches the client sends with the grid, the search box's queries
+   * and the record (a toolbar CheckBox that is part of the DefaultCondition: Book Master's
+   * "Search Not In OB"); the engine's own reads (after a save, the work report) pass none.
    */
-  listFilter?: (user: SessionUser) => RawBuilder<unknown> | null;
+  listFilter?: (user: SessionUser, params?: ListParams) => RawBuilder<unknown> | null;
   /**
    * With `listFilter`: it guards every per-record endpoint too, not only the grid and the
    * record (the popups' rows, the work report, the edit lock, save, delete and Print Selected
@@ -258,6 +270,8 @@ export type ScreenDefinition = {
     user: SessionUser,
     id: number,
     fields: Record<string, FieldValue>,
+    /** The server's settings, for a Save that depends on one (Lab Issue's old-due block). */
+    ctx: { env: Env },
   ) => Promise<number | { id: number; message?: string }>;
   /** The F2 popups this screen's text boxes open, keyed by tblSearch ColumnName (Type 'T'). */
   trans?: Record<string, TransDefinition>;

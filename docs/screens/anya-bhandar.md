@@ -136,9 +136,9 @@ where BookMastkm=<id>` + for **Operators (curr_utypeid = 3)**: `and txtBookTran 
    AnyaBhandar rows and, on Edit, prunes the old ones):
    - dtAuthor / dtAuthorAuth / dtAuthorAuthType from `praksnAuthorT` / `praksnAuthorAuthT` /
      `PraksnAuthorAuthTypeT` (form lines 638–640, verbatim SQL there). Authors are filtered:
-     author rows are dropped when **the book** has any author typed मूळकर्ता/टीकाकार/अनुवादक/विवेचक/लेखक
-     (`prakashannokt not in (…)`, a per-book test, not per author — so a book with a मूळकर्ता gets no
-     संपादक rows at all), while the type rows drop only those types. Quirk; keep, see open questions.
+     an author row typed मूळकर्ता/टीकाकार/अनुवादक/विवेचक/लेखक is dropped (`praksnauthorkm not in (…)`
+     since v3.4.3.1; before, `prakashannokt not in (…)`, a per-book test, so a book with a मूळकर्ता
+     got no संपादक rows at all), and the type rows drop those types.
      txtAuthTran gets `authortype-authorname` per row **appended** to its old text (not cleared).
    - dtBhasha from `praksnBhashaT` (`-prakshnbhashakm AS AnyaBhandarBhashaKm, <TranKm> AS AnyaBhandarKt,
 bhashakt, bhasa_attr, seq`), dtLipi from `praksnLipiT`, dtPrakashak from `praksnPrakT` (same
@@ -192,7 +192,7 @@ Grid click / Up / Down loads the record; lblEntry = `GetEntryUser`.
   New. Clears the panel but **keeps Size and Bhandar** (tag + text) from the previous record, then
   computes RecordNo. On load with an empty grid, New runs automatically (so the Size prompt appears).
 - **txtAuthor** (repository, start of Save, only when dtAuthor has rows): rebuilt from the author
-  popup rows exactly as Book Master's `authorText` in `book.ts` (authtyattr + sign short name,
+  popup rows exactly as Book Master's `authorText` in `book.ts` (the type's name, `authortype` — `authtyattr` up to v3.3.3.6 — + sign short name,
   AnyaName/AuthorName + (Guru) + [Identyty-padvi short] + sign short; `(/)`→` /`, `/,`→`/`) but keyed
   by `AnyaBhandarAuthorKm` / `AnyaBhandarAuthorKt`. With no author rows the typed text is saved.
 - txtPrakashak / txtBhasha / txtLipi are saved **as the box text** (no recompute, unlike Book Master).
@@ -274,7 +274,7 @@ prakname; "False"→"", "True"→"पूर्व", ",,"→",", "--"→"-"). Sub
 | TranName              | Columns / new row                                                                                                                                                                  | Cell lookups (s=0)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | author                | AnyaBhandarAuthorKm (hidden; new = min−1 or −1), authortype, authorname, Seq (editable)                                                                                            | authortype → nested **multiauthortype**; authorname → nested **multiauthor**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| multiauthortype       | AnyaBhandarAuthorAuthTypeKm, AnyaBhandarAuthorKt, authortypekt, authortype, signkt, Sign, seq                                                                                      | authortype: `select authtycokm,authortype,authtyattr from authtype order by authortype`; Sign: `select columnmastkm,name from columnmaster where vibhag = 'sign' and isnull(columnno,0)<10 order by name` (= `SIGN_UNDER_10`). Cell text = `authortype (sign) ,` joined                                                                                                                                                                                                                                                                                                                          |
+| multiauthortype       | AnyaBhandarAuthorAuthTypeKm, AnyaBhandarAuthorKt, authortypekt, authortype, signkt, Sign, seq                                                                                      | authortype: `select authtycokm,authortype from authtype order by authortype`; Sign: `select columnmastkm,name from columnmaster where vibhag = 'sign' and isnull(columnno,0)<10 order by name` (= `SIGN_UNDER_10`). Cell text = `authortype (sign) ,` joined                                                                                                                                                                                                                                                                                                                                     |
 | multiauthor           | AnyaBhandarAuthorAuthKm, AnyaBhandarAuthorKt, authorkt, authorname, AuthAnyaNmKt, AnyaName, padkt, Padvi, Guru, identyty, signkt, Sign, seq                                        | authorname: AUTHOR_LIST (same SQL as book.ts `AUTHOR_LIST`) → sets authorname/AnyaName = mainname, AuthAnyaNmKt 0, authorkt, Guru, identyty; AnyaName: `anyNames`; Padvi: `select tid,vishesh from visheshmast where remark='avastha' and isnull(visheshno,0)>5 order by vishesh`; Sign: SIGN_UNDER_10                                                                                                                                                                                                                                                                                           |
 | prakashak             | AnyaBhandarPrakKm, AnyaBhandarKt, prakashakkt, prakname, purva (checkbox), nameSelected, PrakTypekt, PrakType, Remark, signkt, sign, seq; new row key = frm.TranId (never set → 0) | prakname (col 3): prakmast list with addresses/contacts/gmala/any names (as book.ts PrakTran `prakname`), sets prakashakkt, prakname, nameselected = mainname + " "; nameSelected (col 5): `select replace(0,0,0) as id,prakname as anyanm from prakmast where prakcodekm=<kt> union select replace(0,0,0),anyanm from prakmanaynmt where prakmastkt=<kt>`; PrakType (col 7): `select columnmastkm,name from columnmaster where vibhag = N'prakoption' and isnull(columnno,0)>0 order by name`; sign (col 10): `… vibhag like 'sign' and isnull(columnno,0)<10 …`                                |
 | bhasha                | AnyaBhandarBhashaKm, AnyaBhandarKt, bhashakt, bhasa_attr, seq                                                                                                                      | `select bhashacokm,bhashaname,bhasa_attr from bhasmast order by bhashaname`; adds the next row after a pick on the last row                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
@@ -405,8 +405,10 @@ ddmmyyyy/asDesktopError/SIGN_UNDER_10`. From `book-tran.ts`: `nextLibNo` (move t
    and runs no BookT update (the desktop's `UPDATE BookT … WHERE BookTKt` never worked).
 2. AddBook's BookT row keeps the desktop's minimal insert (BookMastkt, SeriesKt, Libno, MainL=1,
    enuser, endate; no BkGrNo / seq).
-3. Fill-from-book keeps the desktop's per-book author filter (a book with any
-   मूळकर्ता/टीकाकार/अनुवादक/विवेचक/लेखक author gives no संपादक rows at all). Harmless quirk.
+3. Fill-from-book filters the authors one by one, as desktop v3.4.3.1 does: an author row typed
+   मूळकर्ता/टीकाकार/अनुवादक/विवेचक/लेखक is left out, the book's other authors come over. (Up to
+   v3.3.3.6 the test was per book — one such author and the book gave no संपादक rows at all — and
+   the web had kept that as a harmless quirk.)
 4. `nextLibNo` moved from book-tran.ts to book-common.ts with UPDLOCK/HOLDLOCK; Book Tran's
    `next-libno` action uses it unchanged. `authorText` is the one exported from prakashak.ts
    (key column names as a parameter).
@@ -462,3 +464,27 @@ orphans left alone); #7 praksn* keys locked MAX + 1, no skipped key; #8 everythi
 
 Nothing file-related on this form. The Config_Master print layouts with a ShortcutKey appear under
 Selected Column (none locally).
+
+## Desktop v3.4.3.1
+
+- **Author-type text.** The denormalised author text is built from the type's name
+  (`authtype.authortype`) instead of its attribute (`authtype.authtyattr`), and the
+  author-type pick list (multiauthortype) shows two columns (`authtycokm`, `authortype`) —
+  the attribute column is gone. Text stored earlier keeps the old attribute until the record
+  is saved again (the desktop does not rewrite it either).
+  Here that is `txtAuthor` on save (`authorText` in `prakashak.ts`) and the `authortype` column
+  of the Author popup rows read from a book (`frmAnyaBhandar.vb:635,637`).
+- **Book Name F2 list** (`frmAnyaBhandar.vb:601`): a `SamvatType` column (`samvmast.samvatname`,
+  by `BookM.PSamvatcokt`) between Author and Samvat.
+- **Fill-from-book, authors** (`:636-638`): filtered per author, not per book (decision 3). The
+  web's `NOT IN` leaves a NULL `praksnauthorkt` out of the sub-query (none in the data today; one
+  would make the desktop's query return no author).
+- **Fill-from-book, Kruti authors** (`:685-689`): the Kruti references of the book's library
+  numbers and, when the book has a `CommonGrpNo`, of every library number of that common group's
+  books (the old `IsCommonGroup` 1/0 pair was a no-op and is gone).
+- Not changed on the desktop, so not here: the Operator's CM/MS/CP/SN condition (still without
+  `ISNULL`) and `AnyaBhandarRepository.GetMemID` (the new book's OB number is still `BookT`'s
+  largest + 1; Book Master's Library No form now fills gaps, see book-master.md).
+- Waiting for the upgraded database: `praksnBhashaT` / `praksnLipiT` identity keys in AddBook,
+  `VisheshMast.Vibhag`.
+- Tests: `master-anya-bhandar.integration.test.ts` ("v3.4.3.1: SamvatType …").

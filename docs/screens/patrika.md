@@ -250,6 +250,8 @@ The For party is always 0 here. There is no confirmation. For each selected row,
      else the requester.
 3. If that passes, `GetUserNotReturnedBook(me, 0)` → `You Cannot Issue any Books` + CRLF +
    `Please Return<n>  Nos. of 30 days Old Due Books to Issue New Books.`
+   (Desktop v3.4.3.1 switched this check off; on the web it runs only with
+   `LAB_ISSUE_OLD_DUE_BLOCK=true`, see lab-issue-master.md.)
 4. A failure shows the message and **stops**. Rows already inserted stay (no transaction).
 5. Otherwise `Save`: `INSERT INTO LabIssueM (BookTKt,enuserKt,endate,Forkt,StatusKt,Type) VALUES (…, getdate(), 0, <DlvrPen=9635>, 'Patrika')`.
 6. After the loop, if the last insert succeeded: "Book Issued Successfully".

@@ -1,5 +1,6 @@
 'use client';
 
+import { desktopOnlyMessage } from '@/features/master/desktopOnly';
 import type { ActionResult, ChildRow, PickList } from '@gglib/shared';
 import { useMemo, useRef, useState } from 'react';
 import type { ContextMenuItem } from '@/components/ui/ContextMenu';
@@ -88,7 +89,7 @@ function buildSpec(deps: Deps, showAll: boolean): ScreenSpec {
       ['Mixsign', 447, 45],
       ['Issue', 447, 81],
       ['NewLibNo', 447, 117],
-      ['Inword', 447, 153],
+      ['Inward', 447, 153],
       ['Quality', 656, 9],
       ['Mixsign Rem', 656, 45],
       ['Check Rem', 656, 81],
@@ -263,7 +264,7 @@ export function BookTranDialog({
         label: 'For Selected Record',
         items: [
           item('Show BookMaster', () => void openOther(a, 'show-book-master')),
-          item('Inword Master', () => void openOther(a, 'inword-master')),
+          item('Inward Master', () => void openOther(a, 'inword-master')),
           item('Party Master', () => void openOther(a, 'party-master')),
           item('Issue Master', () => void openOther(a, 'issue-master')),
           item('Anya Bhandar', () => void openOther(a, 'anya-bhandar')),
@@ -359,6 +360,28 @@ export function BookTranDialog({
             onSelect: a.printSelectedColumn,
           }
         : item('Print Selected Columns', a.printSelectedColumn),
+      // v3.4.3.1: the four items compare BookTranMixSignT with the folders of the office's scan
+      // and e-book shares (the last two captions are the desktop's, the fourth a repeat).
+      {
+        kind: 'submenu',
+        label: 'Utility',
+        items: [
+          'Update SN Not Exist In MixSign But Exist In Path',
+          'Update EB Not Exist In MixSign But Exist In Path',
+          'Update SN Exist In MixSign But Not Exist In Path',
+          'Update EB Not Exist In MixSign But Exist In Path',
+        ].map((label) =>
+          item(
+            label,
+            () =>
+              void a.alert(
+                desktopOnlyMessage(
+                  `${label} (it reads the scan and e-book folders of the office's shares)`,
+                ),
+              ),
+          ),
+        ),
+      },
     ];
   }
 

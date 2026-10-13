@@ -37,7 +37,7 @@ describe.skipIf(!hasDb)('Tirth Raksha Master (integration)', () => {
       bhasha: await one(sql`SELECT TOP 1 bhashacokm FROM bhasmast ORDER BY bhashacokm`),
       author: await one(sql`SELECT TOP 1 authorcokm FROM authmast ORDER BY authorcokm`),
       authorType: await one(
-        sql`SELECT TOP 1 authtycokm FROM authtype WHERE ISNULL(authtyattr, '') <> '' ORDER BY authtycokm`,
+        sql`SELECT TOP 1 authtycokm FROM authtype WHERE ISNULL(authortype, '') <> '' AND ISNULL(authtyattr, '') <> authortype ORDER BY authtycokm`,
       ),
     };
   }
@@ -203,6 +203,12 @@ describe.skipIf(!hasDb)('Tirth Raksha Master (integration)', () => {
     // UpdateVishay rewrote the name from its line; the author text came from GetAuthorName.
     expect(String(rec.TirthRakshaName)).not.toBe('typed');
     expect(String(rec.txtAuthor)).toContain("O'Any");
+    // v3.4.3.1: the type's name (authtype.authortype), no longer its attribute.
+    const typeName = (
+      await sql<{ t: string }>`
+        SELECT authortype AS t FROM authtype WHERE authtycokm = ${f.authorType}`.execute(h.trx)
+    ).rows[0]!.t.trim();
+    expect(String(rec.txtAuthor).startsWith(typeName)).toBe(true);
     expect(String(rec.PetaVishay)).not.toBe('');
     const count = (table: string) =>
       h.scalar(sql`SELECT COUNT(*) FROM ${sql.table(table)} WHERE TirthRakshaKt = ${id}`);

@@ -150,7 +150,24 @@ export class MasterService {
 
   /** The screen's tblSearch rows without its secret columns (ScreenDefinition.secretColumns). */
   private async tbl(db: Executor, def: ScreenDefinition): Promise<TblSearchRow[]> {
-    const rows = await loadTblSearch(db, def.table);
+    let rows = await loadTblSearch(db, def.table);
+    if (def.gridColumnsAlso?.length) {
+      // ScreenDefinition.gridColumnsAlso: shown in the grid, after tblSearch's own grid columns.
+      const also = def.gridColumnsAlso;
+      rows = rows.map((r) => {
+        const at = also.findIndex(
+          (c) => c.column.toLowerCase() === (r.ColumnName ?? '').toLowerCase(),
+        );
+        return at < 0 || r.DisplayInGrid
+          ? r
+          : {
+              ...r,
+              DisplayInGrid: true,
+              GridSeq: 100_000 + at,
+              GridSelect: also[at]!.select ?? (r.JoinCondition || r.ColumnName || ''),
+            };
+      });
+    }
     if (!def.secretColumns?.length) return rows;
     const secret = isSecret(def.secretColumns);
     return rows.filter((r) => !secret(r));
@@ -253,7 +270,7 @@ export class MasterService {
       db,
       def,
       gridColumnsSql(rows, def.ucSearchColumns),
-      sql`${where} ${ids ? EMPTY : this.defaultCondition(def)} ${this.listCondition(def, params)} ${this.userFilter(def, user)}`,
+      sql`${where} ${ids ? EMPTY : this.defaultCondition(def)} ${this.listCondition(def, params)} ${this.userFilter(def, user, params)}`,
       def.listOrderBy
         ? trustedSql(`ORDER BY ${def.listOrderBy}`)
         : def.listOrderAsc
@@ -282,8 +299,8 @@ export class MasterService {
   }
 
   /** The screen's DefaultCondition for this user, as `AND (…)`, or nothing. */
-  private userFilter(def: ScreenDefinition, user?: SessionUser): Sql {
-    const filter = user && def.listFilter ? def.listFilter(user) : null;
+  private userFilter(def: ScreenDefinition, user?: SessionUser, params?: ListParams): Sql {
+    const filter = user && def.listFilter ? def.listFilter(user, params) : null;
     return filter ? sql`AND (${filter})` : EMPTY;
   }
 
@@ -293,6 +310,7 @@ export class MasterService {
     id: number,
     db: Executor = this.db,
     user?: SessionUser,
+    params?: ListParams,
   ): Promise<GridRow> {
     const def = this.definition(screen);
     const rows = await this.tbl(db, def);
@@ -300,7 +318,7 @@ export class MasterService {
       db,
       def,
       recordColumnsSql(rows),
-      sql`AND ${ident(def.table)}.${ident(def.primaryColumn)} IN (${id}) ${this.userFilter(def, user)}`,
+      sql`AND ${ident(def.table)}.${ident(def.primaryColumn)} IN (${id}) ${this.userFilter(def, user, params)}`,
       EMPTY,
       0,
       Boolean(def.recordJoin),
@@ -544,6 +562,7 @@ export class MasterService {
       notIn: boolean;
       values: string[];
       text: string;
+      params?: ListParams;
     },
     db: Executor = this.db,
     user?: SessionUser,
@@ -569,6 +588,10 @@ export class MasterService {
       if (statements.length < 2) {
         where = sql`AND LTRIM(RTRIM(${pk})) ${inOrNot} ${textList(req.values)}`;
       } else {
+        // UcSearch (CommonLibrary v3.4.3.1): one clause, the second statement always filled
+        // with the picked values, so "Not In" also finds the records with no child row at all
+        // (before: `IN (<statement with NOT IN>) AND NOT IN (<statement with IN>)`, which only
+        // found records that had some other child).
         const idsQuery = this.fillTemplate(
           statements[1]!,
           def,
@@ -576,28 +599,15 @@ export class MasterService {
           req.scope,
           req.gridIds,
           req.values,
-          req.notIn,
         );
-        where = sql`AND LTRIM(RTRIM(${pk})) IN (${idsQuery})`;
-        if (req.notIn) {
-          const again = this.fillTemplate(
-            statements[1]!,
-            def,
-            col,
-            req.scope,
-            req.gridIds,
-            req.values,
-            false,
-          );
-          where = sql`${where} AND LTRIM(RTRIM(${pk})) NOT IN (${again})`;
-        }
+        where = sql`AND LTRIM(RTRIM(${pk})) ${inOrNot} (${idsQuery})`;
       }
     }
     const found = await this.select(
       db,
       def,
       gridColumnsSql(rows, def.ucSearchColumns),
-      sql`${where} ${this.searchCondition(def)} ${this.userFilter(def, user)}`,
+      sql`${where} ${this.searchCondition(def)} ${this.userFilter(def, user, req.params)}`,
       EMPTY,
       0,
       true,
@@ -608,7 +618,7 @@ export class MasterService {
   /** Search In Range (right-click on the search box): numbers "1-10" or dates dd/MM/yyyy. */
   async range(
     screen: string,
-    req: { columnId: number; from: string; to: string },
+    req: { columnId: number; from: string; to: string; params?: ListParams },
     db: Executor = this.db,
     user?: SessionUser,
   ): Promise<GridRow[]> {
@@ -642,7 +652,7 @@ export class MasterService {
       ? sql`BETWEEN CAST(${from} AS date) AND CAST(${to} AS date)`
       : sql`BETWEEN ${from} AND ${to}`;
     const { rows: result } = await sql<GridRow>`
-      WITH paging AS (SELECT ${cols} FROM ${ident(def.table)} ${this.join(def)} WHERE 1 = 1 ${this.searchCondition(def)} ${this.userFilter(def, user)})
+      WITH paging AS (SELECT ${cols} FROM ${ident(def.table)} ${this.join(def)} WHERE 1 = 1 ${this.searchCondition(def)} ${this.userFilter(def, user, req.params)})
       SELECT * FROM paging WHERE ${ident(col.ColumnName!)} ${range}
     `.execute(db);
     return result;
@@ -651,7 +661,7 @@ export class MasterService {
   /** Search For Blank / For Not In Blank (UcSearch.SearchRecords). */
   async blank(
     screen: string,
-    req: { columnId: number; blank: boolean; withinIds?: number[] },
+    req: { columnId: number; blank: boolean; withinIds?: number[]; params?: ListParams },
     db: Executor = this.db,
     user?: SessionUser,
   ): Promise<GridRow[]> {
@@ -674,7 +684,7 @@ export class MasterService {
       db,
       def,
       gridColumnsSql(rows, def.ucSearchColumns),
-      sql`${where} ${this.userFilter(def, user)}`,
+      sql`${where} ${this.userFilter(def, user, req.params)}`,
       EMPTY,
       0,
       true,
@@ -747,7 +757,7 @@ export class MasterService {
     }
     const saved = await inTransaction(db, async (trx) => {
       if (id > 0) await this.assertNotLockedByOther(trx, def, user, id);
-      return def.save(trx, user, id, fields);
+      return def.save(trx, user, id, fields, { env: this.env });
     });
     const savedId = typeof saved === 'number' ? saved : saved.id;
     const [row] = await this.list(screen, [savedId], db, user);
@@ -988,6 +998,8 @@ export class MasterService {
     ids: number[],
     params: Record<string, string | number | boolean | number[]> = {},
     db: Executor = this.db,
+    /** The form's switches (ScreenDefinition.listFilter's params) for the rows it lists. */
+    switches: ListParams = {},
   ): Promise<ActionResult> {
     const def = this.definition(screen);
     const run = def.actions?.[name];
@@ -999,8 +1011,15 @@ export class MasterService {
         this.security.assert(typeof given === 'string' ? given : '', first),
       list: (where, opts) =>
         where
-          ? this.listWhere(screen, where, db, user, opts?.limit ? (def.listLimit ?? 0) : 0)
-          : this.list(screen, undefined, db, user),
+          ? this.listWhere(
+              screen,
+              where,
+              db,
+              user,
+              opts?.limit ? (def.listLimit ?? 0) : 0,
+              switches,
+            )
+          : this.list(screen, undefined, db, user, switches),
     });
     if (result.kind === 'refreshed') {
       return {
@@ -1031,6 +1050,7 @@ export class MasterService {
     db: Executor = this.db,
     user?: SessionUser,
     top = 0,
+    params?: ListParams,
   ): Promise<GridRow[]> {
     const def = this.definition(screen);
     const rows = await this.tbl(db, def);
@@ -1038,7 +1058,7 @@ export class MasterService {
       db,
       def,
       gridColumnsSql(rows, def.ucSearchColumns),
-      sql`AND ${where} ${this.userFilter(def, user)}`,
+      sql`AND ${where} ${this.userFilter(def, user, params)}`,
       sql`ORDER BY ${ident(def.primaryColumn)} DESC`,
       top,
       true,
@@ -1200,7 +1220,6 @@ export class MasterService {
     scope: 'grid' | 'all',
     gridIds: number[],
     values: string[],
-    notIn = false,
   ): Sql {
     let text = unescapeSql(template);
     if (scope === 'all') {
@@ -1217,8 +1236,7 @@ export class MasterService {
     const pieces: Sql[] = parts.map((part) => {
       if (/^\{Id\}$/i.test(part))
         return sql`SELECT CAST(val AS bigint) FROM dbo.SplitString(${gridIds.join(',')}, ',')`;
-      if (/^IN\s*\(\{tId\}\)$/i.test(part))
-        return sql`${notIn ? sql`NOT IN` : sql`IN`} ${textList(values)}`;
+      if (/^IN\s*\(\{tId\}\)$/i.test(part)) return sql`IN ${textList(values)}`;
       return trustedSql(part);
     });
     return sql.join(pieces, sql``);

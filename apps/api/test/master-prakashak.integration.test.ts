@@ -113,13 +113,13 @@ describe.skipIf(!hasDb)('Prakashak Master via the master engine (integration)', 
 
   it('saves the nested authors and builds txtAuthor, then deletes with every child row', async () => {
     const type = await h.scalar(
-      sql`SELECT TOP 1 authtycokm AS n FROM authtype WHERE ISNULL(authtyattr, '') <> ''`,
+      sql`SELECT TOP 1 authtycokm AS n FROM authtype WHERE ISNULL(authortype, '') <> '' AND ISNULL(authtyattr, '') <> authortype`,
     );
     const attr = String(
       (
         await sql<{
           a: string;
-        }>`SELECT authtyattr AS a FROM authtype WHERE authtycokm = ${type}`.execute(h.trx)
+        }>`SELECT authortype AS a FROM authtype WHERE authtycokm = ${type}`.execute(h.trx)
       ).rows[0]!.a,
     );
     const author = await h.scalar(

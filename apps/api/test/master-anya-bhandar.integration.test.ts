@@ -25,7 +25,7 @@ describe.skipIf(!hasDb)('Anya Bhandar (integration)', () => {
         sql`SELECT TOP 1 authorcokm FROM authmast WHERE authorcokm > (SELECT MIN(authorcokm) FROM authmast) ORDER BY authorcokm`,
       ),
       authorType: await one(
-        sql`SELECT TOP 1 authtycokm FROM authtype WHERE ISNULL(authtyattr, '') <> '' ORDER BY authtycokm`,
+        sql`SELECT TOP 1 authtycokm FROM authtype WHERE ISNULL(authortype, '') <> '' AND ISNULL(authtyattr, '') <> authortype ORDER BY authtycokm`,
       ),
       vishay: await one(
         sql`SELECT TOP 1 vishaycokm FROM vishay WHERE ISNULL(vishay_nm, '') <> '' ORDER BY vishaycokm`,
@@ -222,6 +222,12 @@ describe.skipIf(!hasDb)('Anya Bhandar (integration)', () => {
     expect(Number(rec.enuser)).toBeGreaterThan(0);
     // txtAuthor is rebuilt from the author rows.
     expect(String(rec.txtAuthor)).toContain("O'Any");
+    // v3.4.3.1: the type's name (authtype.authortype), no longer its attribute.
+    const typeName = (
+      await sql<{ t: string }>`
+        SELECT authortype AS t FROM authtype WHERE authtycokm = ${f.authorType}`.execute(h.trx)
+    ).rows[0]!.t.trim();
+    expect(String(rec.txtAuthor).startsWith(typeName)).toBe(true);
     expect(await count('AnyaBhandarPrakT', id)).toBe(1);
     expect(await count('AnyaBhandarBhashaT', id)).toBe(1);
     expect(await count('AnyaBhandarLipiT', id)).toBe(1);
@@ -446,6 +452,72 @@ describe.skipIf(!hasDb)('Anya Bhandar (integration)', () => {
     expect(sizes.rows.length).toBeGreaterThan(0);
     const bhandars = (await h.user.get(`${B}/f2/BhandarKt`)).body as PickList;
     expect(bhandars.rows.some((r) => r[0] === f.bhandar)).toBe(true);
+  }, 60_000);
+
+  it('v3.4.3.1: SamvatType in the book list, authors filtered one by one, Kruti authors of the common group', async () => {
+    const books = (await h.user.get(`${B}/f2/BookMastKt`)).body as PickList;
+    expect(books.columns).toEqual([
+      'BookMastkm',
+      'BookName',
+      'Part',
+      'Prakashak',
+      'Author',
+      'SamvatType',
+      'Samvat',
+      'Bhasha',
+      'Pages',
+      'TotalPages',
+      'LibNo',
+    ]);
+    expect(books.rows.some((r) => r[5] !== null && r[5] !== '')).toBe(true);
+
+    // A book with an author of a "done by" type and one without: only the first is dropped.
+    const TYPED = sql`(SELECT praksnauthorkt FROM PraksnAuthorAuthTypeT WHERE authortypekt IN
+      (SELECT authtycokm FROM authtype WHERE authortype IN (N'मूळकर्ता', N'टीकाकार', N'अनुवादक', N'विवेचक', N'लेखक')))`;
+    const mixed = await h.scalar(sql`
+      SELECT TOP 1 a.prakashannokt FROM praksnAuthorT a
+      WHERE a.praksnauthorkm NOT IN ${TYPED}
+        AND EXISTS (SELECT 1 FROM praksnAuthorT t WHERE t.prakashannokt = a.prakashannokt AND t.praksnauthorkm IN ${TYPED})
+        AND EXISTS (SELECT 1 FROM BookM m WHERE m.BookMastkm = a.prakashannokt AND ISNULL(m.txtBookTran, '') NOT LIKE '%CM%'
+          AND ISNULL(m.txtBookTran, '') NOT LIKE '%ms%' AND ISNULL(m.txtBookTran, '') NOT LIKE '%CP%' AND ISNULL(m.txtBookTran, '') NOT LIKE '%SN%')
+      ORDER BY a.prakashannokt DESC`);
+    expect(mixed).toBeGreaterThan(0);
+    const untyped = await h.scalar(sql`
+      SELECT COUNT(*) FROM praksnAuthorT WHERE prakashannokt = ${mixed} AND praksnauthorkm NOT IN ${TYPED}`);
+    const fill = async (bookId: number) =>
+      (
+        await h.user
+          .post(`${B}/action/fill-from-book`)
+          .send({ ids: [], params: { bookId, tranKm: 0 } })
+      ).body;
+    const filled = await fill(mixed);
+    const authors = filled.trans.AuthTran.rows as GridRow[];
+    expect(authors).toHaveLength(untyped);
+    const keys = new Set(authors.map((r) => Number(r.AnyaBhandarAuthorKm)));
+    const [names, types] = filled.trans.AuthTran.extras as [GridRow[], GridRow[]];
+    expect(names.every((r) => keys.has(Number(r.AnyaBhandarAuthorKt)))).toBe(true);
+    expect(types.every((r) => keys.has(Number(r.AnyaBhandarAuthorKt)))).toBe(true);
+
+    // Kruti authors: the book's own library numbers, and those of its common group's books.
+    const ref = (
+      await sql<{ book: number; author: number }>`
+        SELECT TOP 1 t.BookMastkt AS book, ka.authorcokt AS author FROM krutireflibno r
+        INNER JOIN BookT t ON t.tid = r.BookTKt INNER JOIN krutiautht ka ON ka.krutimstkt = r.krutimstkt
+        INNER JOIN authmast am ON am.authorcokm = ka.authorcokt INNER JOIN krutiMst k ON k.krutimstkm = r.krutimstkt
+        ORDER BY r.BookTKt DESC`.execute(h.trx)
+    ).rows[0]!;
+    const lone = await h.scalar(sql`
+      SELECT TOP 1 m.BookMastkm FROM BookM m WHERE ISNULL(m.CommonGrpNo, 0) = 0 AND ISNULL(m.txtBookTran, '') LIKE 'B0%'
+        AND ISNULL(m.txtBookTran, '') NOT LIKE '%,%'
+        AND NOT EXISTS (SELECT 1 FROM BookT t INNER JOIN krutireflibno r ON r.BookTKt = t.tid WHERE t.BookMastkt = m.BookMastkm)
+      ORDER BY m.BookMastkm DESC`);
+    const kruti = async () =>
+      ((await fill(lone)).trans.KrutiAuthors.rows as GridRow[]).map((r) => Number(r.AuthorKt));
+    expect(await kruti()).toEqual([]);
+    await sql`UPDATE BookM SET CommonGrpNo = 987654321 WHERE BookMastkm IN (${lone}, ${ref.book})`.execute(
+      h.trx,
+    );
+    expect(await kruti()).toContain(Number(ref.author));
   }, 60_000);
 
   it('opens the books, refuses locks, and deletes with every child row', async () => {

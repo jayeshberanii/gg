@@ -185,20 +185,53 @@ export function ddmmyyyy(v: unknown): string | null {
  * GetMemID: the next library number of a series (bookmast.bookprefix + zero-padded counter).
  * The counter's range is held (UPDLOCK, HOLDLOCK) until the caller's transaction ends, so two
  * saves cannot take the same number (Anya Bhandar's obtain-book insert); outside a transaction
- * (Book Tran's F2 on the series) the lock ends with the statement. `LEFT(libno, 2)` is the
- * desktop's test, kept as it is (a one-letter prefix never matches it).
+ * (Book Tran's F2 on the series) the lock ends with the statement, and Save's "LibNo Already
+ * Exist" is what stops a second user. `LEFT(libno, 2)` is the desktop's test, kept as it is (a
+ * one-letter prefix never matches it).
+ *
+ * `fillGaps` is MdlLib.GetMemID since v3.4.3.1 (Book Tran; AnyaBhandarRepository's own copy
+ * still takes BookT's largest + 1): except for the SN and EB series, the first number missing
+ * between the series' BookT numbers (the first row of `EXEC Print_MissingNo 'libary', <prefix>`,
+ * a cursor over that prefix's BookT rows: about 2 s for the 62,000 of B0); with no gap, one
+ * more than the largest in BookT and HastpratLibNoT together.
  */
-export async function nextLibNo(db: Executor, seriesKt: number): Promise<string> {
+export async function nextLibNo(
+  db: Executor,
+  seriesKt: number,
+  opts: { fillGaps?: boolean } = {},
+): Promise<string> {
   if (seriesKt <= 0) return '';
   const prefix = text(
     await scalar(db, sql`SELECT bookprefix FROM bookmast WHERE bookcodekm = ${seriesKt}`),
   );
-  const next = int(
+  // Read first, with the range lock: the gap search and the Hastprat numbers come after it.
+  let next = int(
     await scalar(
       db,
       sql`SELECT ISNULL(MAX((RIGHT(libno, 5))), 0) + 1 FROM BookT WITH (UPDLOCK, HOLDLOCK) WHERE LEFT(libno, 2) = ${prefix}`,
     ),
   );
+  if (opts.fillGaps) {
+    const missing =
+      prefix === 'SN' || prefix === 'EB'
+        ? []
+        : (
+            await asDesktopError(() =>
+              sql<{ No: string | null }>`EXEC Print_MissingNo 'libary', ${prefix}`.execute(db),
+            )
+          ).rows;
+    if (missing.length > 0) {
+      next = int(missing[0]!.No);
+    } else {
+      const hastprat = int(
+        await scalar(
+          db,
+          sql`SELECT ISNULL(MAX((RIGHT(libno, 5))), 0) + 1 FROM HastpratLibNoT WITH (UPDLOCK, HOLDLOCK) WHERE LEFT(libno, 2) = ${prefix}`,
+        ),
+      );
+      next = Math.max(next, hastprat);
+    }
+  }
   const digits = String(next).trim();
   const width = prefix.length === 1 ? 6 : 5;
   return digits.length > 6 ? '' : prefix + digits.padStart(Math.max(width, digits.length), '0');

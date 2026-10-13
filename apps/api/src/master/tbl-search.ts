@@ -30,6 +30,11 @@ export type TblSearchRow = {
   PrintSeq: number | null;
   PrintColumn: string | null;
   PrintDisplayName: string | null;
+  /**
+   * Not a tblSearch column: the grid query's expression for a column the screen adds to its grid
+   * itself (ScreenDefinition.gridColumnsAlso).
+   */
+  GridSelect?: string;
 };
 
 /**
@@ -67,6 +72,7 @@ export function gridColumnsSql(rows: TblSearchRow[], ucSearch = false): string {
     .filter((r) => r.DisplayInGrid && selectable(r))
     .sort((a, b) => (a.GridSeq ?? -1) - (b.GridSeq ?? -1))
     .map((r) => {
+      if (has(r.GridSelect)) return r.GridSelect!;
       if (r.IsExternalColumn && has(r.JoinCondition)) return r.JoinCondition!;
       if (r.IsExternalColumn) return `''${r.ColumnName}`;
       if (has(r.GridColumnName)) {

@@ -23,8 +23,11 @@ export type ActionRowTargets = {
 export type ActionRunner = {
   /** POST action/<name>, returning what it produced (or null after showing an error). */
   call: (action: string, params?: ActionParams, ids?: number[]) => Promise<ActionResult | null>;
-  /** A right-click action, with its result shown the way the desktop's handler shows it. */
-  run: (action: string, params?: ActionParams, ids?: number[]) => Promise<void>;
+  /**
+   * A right-click action, with its result shown the way the desktop's handler shows it. False
+   * when the server refused it (the error was shown).
+   */
+  run: (action: string, params?: ActionParams, ids?: number[]) => Promise<boolean>;
 };
 
 /**
@@ -36,7 +39,16 @@ export type ActionRunner = {
  */
 export function useActionRunner(
   screen: string,
-  { defaultIds = [], rows }: { defaultIds?: number[]; rows?: ActionRowTargets } = {},
+  {
+    defaultIds = [],
+    rows,
+    switches,
+  }: {
+    defaultIds?: number[];
+    rows?: ActionRowTargets;
+    /** The form's ticked switches (ToolbarCheckbox.listSwitch), sent with every action. */
+    switches?: Record<string, boolean>;
+  } = {},
 ): ActionRunner {
   const msg = useMessageBox();
   const workspace = useWorkspace();
@@ -53,6 +65,7 @@ export function useActionRunner(
       return await api.post<ActionResult>(`/master/${screen}/action/${action}`, {
         ids: ids ?? defaultIds,
         ...(params ? { params } : {}),
+        ...(switches && Object.keys(switches).length > 0 ? { switches } : {}),
       });
     } catch (err) {
       await msg.alert(errorMessage(err));
@@ -62,7 +75,7 @@ export function useActionRunner(
 
   async function run(action: string, params?: ActionParams, ids?: number[]) {
     const result = await call(action, params, ids);
-    if (!result) return;
+    if (!result) return false;
     switch (result.kind) {
       case 'message':
         if (result.message) await msg.alert(result.message);
@@ -110,6 +123,7 @@ export function useActionRunner(
         });
         break;
     }
+    return true;
   }
 
   return { call, run };

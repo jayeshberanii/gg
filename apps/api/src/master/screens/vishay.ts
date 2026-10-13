@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import { sql } from 'kysely';
 import { type Executor, idList } from '../../db/legacy-sql.js';
 import { pickListOf } from '../values.js';
@@ -121,6 +122,14 @@ export const vishayMaster: ScreenDefinition = {
   },
 
   async save(trx, user, id, f) {
+    // v3.4.3.1 GetValidationMessage's second rule (add and edit): the name is already taken.
+    const name = trimmed(f.vishay_nm);
+    const { rows: same } = await sql<{ n: number }>`
+      SELECT COUNT(*) AS n FROM Vishay WHERE vishay_nm = ${name} AND vishaycokm <> ${id}
+    `.execute(trx);
+    if (Number(same[0]?.n ?? 0) > 0)
+      throw new BadRequestException(`Vishay Name - ${name} Already Exist`);
+
     const v = {
       vishay_nm: trimmed(f.vishay_nm),
       brif: trimmed(f.brif),

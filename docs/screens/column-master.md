@@ -33,7 +33,9 @@ anyone else. The desktop enforced this only in its toolbar.
 
 ## Validation (Save, in order)
 
-`"Please Enter Vibhag"`, `"Please Enter Name"`.
+`"Please Enter Vibhag"`, `"Please Enter Name"`, then (v3.4.3.1) `"Recor Already Exist"` (sic)
+when another record has the same Name and Vibhag (`ColumnMastkm <> id AND Name = … AND Vibhag =
+…`, both trimmed; checked at the top of `save`).
 
 ## Popups
 
@@ -94,3 +96,15 @@ a dialog) — no web screen opens it that way yet.
   allowed), validation order, max+1 add, INSQ blanks, IsPrint, up levels saved and kept on a
   plain edit, Uplevel list by TranType, references saved and read back, row colour flag,
   delete refused, Vibhag->Head.
+
+## Desktop v3.4.3.1
+
+- **Carried over:** the duplicate (Name + Vibhag) check. The local DB has 33 such pairs used
+  by more than one row; those rows cannot be saved again until renamed (on the desktop too).
+- **Waiting for the upgraded DB:** the IsCompleted checkbox (`columnmaster.IsCompleted` and its
+  `tblSearch` row do not exist yet).
+- **Left out:** Utility › "Replace In Use Current Record With Another Record" — its desktop
+  handler is an empty `Try/Catch`, so the item does nothing.
+- IsPrint: the desktop used to load the box unchecked whatever was stored (`Val("True")` is 0)
+  and so cleared it on every edit; v3.4.3.1 loads it properly. The web always did.
+- Not fixed on the desktop: up levels wiped on edit, `UplevelId` set to 0 (the web's fixes stand).

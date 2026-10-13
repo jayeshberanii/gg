@@ -913,7 +913,7 @@ export const graphicsDetail: ScreenDefinition = {
      * request for the parent's book (`ids[0]` = Graphickt). Fix: the desktop set LabIssueMkm to
      * the graphicbkt id, so it overwrote an unrelated request instead of creating one.
      */
-    async 'request-lab-issue'(db, user, ids): Promise<ActionResult> {
+    async 'request-lab-issue'(db, user, ids, ctx): Promise<ActionResult> {
       const { rows } = await sql<{ BookTKt: number | null; bkname: string | null }>`
         SELECT BookTKt, bkname FROM GraphicBKM WHERE graphicBkm = ${int(ids[0])}
       `.execute(db);
@@ -927,6 +927,7 @@ export const graphicsDetail: ScreenDefinition = {
           [{ id: int(r.BookTKt), name: text(r.bkname) }],
           0,
           'Book',
+          ctx.env.LAB_ISSUE_OLD_DUE_BLOCK,
         ),
       };
     },

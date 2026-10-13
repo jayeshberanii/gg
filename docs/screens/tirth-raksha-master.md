@@ -194,7 +194,7 @@ GetMaxBookSeq(BookTKt)`.
   `dtAuthorAuth` (`…AuthorAuthorKm, TirthRakshaAuthorKt, authorkt, authorname, AuthAnyaNmKt,
 AnyaName, padkt, Padvi, Guru, identyty, signkt, Sign, seq`), `dtAuthorAuthType`
   (`…AuthorAuthorTypeKm, TirthRakshaAuthorKt, authortypekt, authortype, signkt, Sign, seq`).
-- multiauthortype: F2 col 4 `select authtycokm,authortype,authtyattr from authtype order by
+- multiauthortype: F2 col 4 `select authtycokm,authortype from authtype order by
 authortype`; col 6 `select columnmastkm,name from columnmaster where vibhag = 'sign' and
 isnull(columnno,0)<10 order by name`. Parent cell = `authortype (sign) ,…` joined.
 - multiauthor: F2 authorname (authmast list incl. Guru, identyty, vibhag, …; sets authorname,
@@ -206,7 +206,7 @@ select AuthAnyaNmKm as ID,AnyaName from AuthMAnyNmT where AuthmastKt=<authorkt>`
   `TirthRakshaAuthorKt` (inserted with the new author key). Deletes in order AuthorType, Author,
   AuthorT for keys not kept. No audit columns on these three tables.
 - `TirthRakshaM.txtAuthor = GetAuthorName(...)`, the same algorithm as Prakashak Master's
-  `txtAuthor` (`authtyattr` + sign ShortNm per type; AnyaName or AuthorName, `(Guru)`,
+  `txtAuthor` (the type's name, `authortype` — `authtyattr` up to v3.3.3.6 — + sign ShortNm per type; AnyaName or AuthorName, `(Guru)`,
   `[Identyty-avastha ShortNm]`, sign ShortNm; then `.Replace("(/)"," /").Replace("/,","/")`).
   When the popup was not opened on an edit, the stored `txtAuthor` is kept. Reuse prakashak.ts.
 
@@ -446,3 +446,12 @@ Deferred / not ported:
 - AddTableInfo ("add new" from the F2 list, frmVGPMmast) for Tirth / Purnata / Project / Done By
   and the Kshetra / Kruti / Vishay / Main Person cell lists — not in the engine yet.
 - The dead `IsBookSeqExist` BookSeq shift.
+
+## Desktop v3.4.3.1
+
+- **Author-type text.** The denormalised author text is built from the type's name
+  (`authtype.authortype`) instead of its attribute (`authtype.authtyattr`), and the
+  author-type pick list (multiauthortype) shows two columns (`authtycokm`, `authortype`) —
+  the attribute column is gone. Text stored earlier keeps the old attribute until the record
+  is saved again (the desktop does not rewrite it either).
+  (`TirthRakshaRepository.vb:535`.) The rest of the Tirth Raksha rework needs the upgraded DB.

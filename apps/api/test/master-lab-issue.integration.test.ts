@@ -144,7 +144,7 @@ describe.skipIf(!hasDb)('Lab Issue Master via the master engine (integration)', 
     expect((await row(id)).BookTKt).toBe(tids[1]);
   });
 
-  it('refuses a user with 30-day-old undelivered returns (GetUserNotReturnedBook)', async () => {
+  it('does not hold 30-day-old due books against a request (v3.4.3.1: the check is off by default)', async () => {
     const user = await me(h.user);
     const { tids } = await freeCopies();
     const retPen = await status('RetPen');
@@ -153,15 +153,7 @@ describe.skipIf(!hasDb)('Lab Issue Master via the master engine (integration)', 
       VALUES (${tids[1]}, ${user.id}, DATEADD(DAY, -45, GETDATE()), 0, ${retPen}, 'Book', 1, DATEADD(DAY, -40, GETDATE()))
     `.execute(h.trx);
     const res = await add(h.user, tids[0]!);
-    expect(res.status).toBe(400);
-    expect(res.body.message).toBe(
-      'You Cannot Issue any Books\r\nPlease Return1  Nos. of 30 days Old Due Books to Issue New Books.',
-    );
-    // For a party, the party's overdue books count instead.
-    const party = await num(sql<{ v: number }>`
-      SELECT TOP 1 partyMkm AS v FROM PartyM WHERE partyMkm NOT IN
-        (SELECT ISNULL(Forkt, 0) FROM LabIssueM WHERE Statuskt = ${retPen}) ORDER BY partyMkm`);
-    expect((await add(h.user, tids[0]!, party)).status).toBe(200);
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
   });
 
   it('lists the free LibNos for F2: all in Add mode, the copies of the book in Edit mode', async () => {
@@ -388,5 +380,47 @@ describe.skipIf(!hasDb)('Lab Issue Master via the master engine (integration)', 
     expect(again.body.message).toBe(
       `Patrika No - ${libNos[1]} already Requested For LabIssue By - ${user.name}`,
     );
+  });
+});
+
+/**
+ * LAB_ISSUE_OLD_DUE_BLOCK=true: LabIssueMRepository.GetUserNotReturnedBook as it was before the
+ * desktop commented it out in v3.4.3.1 ("Temporary Comment").
+ */
+describe.skipIf(!hasDb)('Lab issue with the 30-day old-due block switched on (integration)', () => {
+  const h = useMasterHarness({ env: { LAB_ISSUE_OLD_DUE_BLOCK: 'true' } });
+  const API = '/api/master/lab-issue-master';
+  const add = (bookTKt: number, forKt = 0) =>
+    h.user.post(`${API}/save`).send({ id: 0, fields: { BookTKt: bookTKt, Forkt: forKt } });
+  const MESSAGE =
+    'You Cannot Issue any Books\r\nPlease Return1  Nos. of 30 days Old Due Books to Issue New Books.';
+
+  it('refuses a user with 30-day-old undelivered returns, in the form and in Request For LabIssue', async () => {
+    const userId = (await h.user.get('/api/auth/me')).body.user.id as number;
+    const { rows } = await sql<{ tid: number }>`
+      SELECT TOP 3 t.tid FROM BookT t WHERE ISNULL(t.Libno, '') <> ''
+        AND t.tid NOT IN (SELECT BookTKt FROM LabIssueM) AND t.tid NOT IN (SELECT entrcodekt FROM IssueTran)
+      ORDER BY t.tid DESC`.execute(h.trx);
+    const tids = rows.map((r) => r.tid);
+    const retPen = await h.scalar(sql`
+      SELECT ColumnMastkm FROM columnmaster WHERE Vibhag = 'LabIssueStatus' AND Name = 'RetPen'`);
+    await sql`
+      INSERT INTO LabIssueM (BookTKt, enuserKt, endate, Forkt, StatusKt, Type, DeliveryBykt, DeliveryDt)
+      VALUES (${tids[2]}, ${userId}, DATEADD(DAY, -45, GETDATE()), 0, ${retPen}, 'Book', 1, DATEADD(DAY, -40, GETDATE()))
+    `.execute(h.trx);
+
+    const res = await add(tids[0]!);
+    expect(res.status).toBe(400);
+    expect(res.body.message).toBe(MESSAGE);
+    const request = await h.user
+      .post('/api/master/book-tran/action/request-lab-issue')
+      .send({ ids: [tids[0]], params: { forKt: 0 } });
+    expect(request.body).toEqual({ kind: 'message', message: MESSAGE });
+
+    // For a party, the party's overdue books count instead.
+    const party = await h.scalar(sql`
+      SELECT TOP 1 partyMkm FROM PartyM WHERE partyMkm NOT IN
+        (SELECT ISNULL(Forkt, 0) FROM LabIssueM WHERE Statuskt = ${retPen}) ORDER BY partyMkm`);
+    expect((await add(tids[0]!, party)).status).toBe(200);
   });
 });

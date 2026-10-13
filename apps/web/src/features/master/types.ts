@@ -205,7 +205,7 @@ export type FormContext = {
    */
   continued: boolean;
   /** Runs a right-click action and shows its result. */
-  run: (action: string, params?: ActionParams, ids?: number[]) => Promise<void>;
+  run: (action: string, params?: ActionParams, ids?: number[]) => Promise<boolean>;
   /** Runs one and hands back what it produced, for the caller to show. */
   call: (action: string, params?: ActionParams, ids?: number[]) => Promise<ActionResult | null>;
   /** A popup's rows as the form keeps them (loaded from the server the first time). */
@@ -449,8 +449,11 @@ export type ScreenActions = {
   currentRow: GridRow | null;
   /** Every record the grid shows (GetIdFrom_GridRecord with AllRecords). */
   gridIds: number[];
-  /** Runs a right-click action on the server (POST action/<name>) and shows its result. */
-  run: (action: string, params?: ActionParams, ids?: number[]) => Promise<void>;
+  /**
+   * Runs a right-click action on the server (POST action/<name>) and shows its result. False
+   * when the server refused it (its error was shown).
+   */
+  run: (action: string, params?: ActionParams, ids?: number[]) => Promise<boolean>;
   /** Runs one and hands back what it produced, for the caller to show. */
   call: (action: string, params?: ActionParams, ids?: number[]) => Promise<ActionResult | null>;
   /** MsgBox. */
@@ -474,6 +477,8 @@ export type ScreenActions = {
   tags: Record<string, number>;
   /** FillList: reload the grid as Refresh does (after a menu item changed the records). */
   refresh: () => void;
+  /** The form's switches that are ticked (ToolbarCheckbox.listSwitch), as `name: true`. */
+  switches: Record<string, boolean>;
   /** Sets a box of the form (a menu item that writes into the panel, e.g. txtGroupNo). */
   setField: (name: string, value: string) => void;
   /**
@@ -488,7 +493,20 @@ export type ScreenActions = {
 };
 
 /** A CheckBox of the form outside its panel, drawn over the toolbar's right end. */
-export type ToolbarCheckbox = { name: string; label: string; right: number; disabled?: boolean };
+export type ToolbarCheckbox = {
+  name: string;
+  label: string;
+  right: number;
+  disabled?: boolean;
+  /**
+   * The box is a switch of the form, not a column of the record (frmBookMasterNew's
+   * chkSearchNotInOB): it keeps its state from record to record, is not saved, is sent as a
+   * switch (`name`: true) with the grid's, the search box's and the record's requests
+   * (ScreenDefinition.listFilter's params), and ticking or clearing it reloads the grid
+   * (CheckedChanged -> FillList). Menu items read it from `ScreenActions.switches`.
+   */
+  listSwitch?: boolean;
+};
 
 /** ScreenSpec.toolbarCheckbox as a list. */
 export function toolbarCheckboxes(spec: { toolbarCheckbox?: ToolbarCheckbox | ToolbarCheckbox[] }) {

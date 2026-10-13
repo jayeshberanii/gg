@@ -22,11 +22,11 @@ export const authorTypeMaster: ScreenDefinition = {
   /**
    * AuthTypeRepository.Save. The Brief box (brif) is loaded and shown but the repository's
    * INSERT / UPDATE never write it, so an edited Brief is dropped, as on the desktop.
+   * v3.4.3.1: authtyattr (Attribute) is no longer written; existing values stay as they are.
    */
   async save(trx, _user, id, f) {
     const values = {
       authortype: text(f.authortype),
-      authtyattr: text(f.authtyattr),
       remark: text(f.remark),
       short_name: text(f.short_name),
       uplevalKt: val(f.uplevalkt),
@@ -35,7 +35,7 @@ export const authorTypeMaster: ScreenDefinition = {
     };
     if (id > 0) {
       await sql`
-        UPDATE authtype SET authortype = ${values.authortype}, authtyattr = ${values.authtyattr},
+        UPDATE authtype SET authortype = ${values.authortype},
           remark = ${values.remark}, short_name = ${values.short_name},
           uplevalKt = ${values.uplevalKt}, hindiword = ${values.hindiword}, IsPrint = ${values.IsPrint}
         WHERE authtycokm = ${id}
@@ -44,9 +44,9 @@ export const authorTypeMaster: ScreenDefinition = {
     }
     return insertWithMaxId(trx, 'authtype', 'authtycokm', (newId) =>
       sql`
-        INSERT INTO authtype (authtycokm, authortype, authtyattr, remark, short_name, uplevalKt,
+        INSERT INTO authtype (authtycokm, authortype, remark, short_name, uplevalKt,
                               hindiword, IsPrint)
-        VALUES (${newId}, ${values.authortype}, ${values.authtyattr}, ${values.remark},
+        VALUES (${newId}, ${values.authortype}, ${values.remark},
                 ${values.short_name}, ${values.uplevalKt}, ${values.hindiword}, ${values.IsPrint})
       `.execute(trx),
     );

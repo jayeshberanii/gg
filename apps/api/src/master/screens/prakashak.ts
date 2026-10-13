@@ -215,7 +215,7 @@ export async function authorText(
         st.trim(),
         await scalarText(
           db,
-          sql`SELECT ISNULL(authtyattr, '') FROM authtype WHERE authtycokm = ${int(get(t, 'authortypekt'))}`,
+          sql`SELECT ISNULL(authortype, '') FROM authtype WHERE authtycokm = ${int(get(t, 'authortypekt'))}`,
         ),
       );
       const { rows } = await sql<{ ShortNm: string; ColumnNo: number }>`
@@ -523,9 +523,7 @@ export const prakashakMaster: ScreenDefinition = {
     AuthTran: {
       lookups: {
         libno: LIBNO,
-        authortype: list(
-          sql`SELECT authtycokm, authortype, authtyattr FROM authtype ORDER BY authortype`,
-        ),
+        authortype: list(sql`SELECT authtycokm, authortype FROM authtype ORDER BY authortype`),
         sign: SIGN_UNDER_10,
         authorname: AUTHOR_LIST,
         anyaname: anyNames,

@@ -29,7 +29,13 @@ test('shows the desktop layout and the newest books', async ({ page }) => {
   for (const label of [
     'Book Name',
     'Smvt Type',
-    'GMalaName/No',
+    // Captions of desktop v3.4.3.1.
+    'GMala Name/No',
+    'Pages/Total Pages',
+    'Group No/Name',
+    'Group Pari Name/Part',
+    'Bhasha/Lipi',
+    'Mix Sign/Remark',
     'Prak Vishesh',
     'Library No',
     'Magazine Remark',
@@ -37,6 +43,19 @@ test('shows the desktop layout and the newest books', async ({ page }) => {
     await expect(win.getByText(label, { exact: true })).toBeVisible();
   }
   await expect(win.getByRole('checkbox', { name: 'IsPrint' })).toBeVisible();
+  await expect(grid(page).cell(0, 'txtBookName')).not.toBeEmpty({ timeout: 30_000 });
+  // chkSearchNotInOB (v3.4.3.1): ticking it reloads the grid without the OB library numbers.
+  const notInOb = win.getByRole('checkbox', { name: 'Search Not In OB' });
+  await expect(notInOb).not.toBeChecked();
+  const listed = page.waitForResponse(
+    (r) => r.url().endsWith('/master/book-master/list') && r.request().method() === 'POST',
+  );
+  await notInOb.check();
+  const response = await listed;
+  expect(response.request().postDataJSON()).toMatchObject({ params: { SearchNotInOB: true } });
+  const rows = (await response.json()) as { txtBookTran: string | null }[];
+  expect(rows.length).toBeGreaterThan(0);
+  expect(rows.some((r) => /OB/i.test(r.txtBookTran ?? ''))).toBe(false);
   await expect(grid(page).cell(0, 'txtBookName')).not.toBeEmpty({ timeout: 30_000 });
   // EnableDisableDataEditing: the boxes are read-only until New or Modify.
   await expect(win.getByLabel('Book Name')).toHaveAttribute('readonly', '');

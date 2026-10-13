@@ -353,6 +353,128 @@ describe.skipIf(!hasDb)('Author Master via the master engine (integration)', () 
     expect(wr.Remark).toContain('authorname(New Name)');
   });
 
+  it('upserts the Samvat rows by key and clears only references to removed rows (v3.4.3.1)', async () => {
+    const samvat = (over: Record<string, unknown>) => ({
+      AuthorSamvatKm: 0,
+      SamvatKindKt: samvatKindKt,
+      SamvatKindName: 'दी.सं.',
+      Remark: '',
+      AsamvatKt: 0,
+      Asamvat: '',
+      Vksamvat: 1500,
+      BookTKt: 0,
+      PageNo: '',
+      SthalKt: 0,
+      IsPrint: false,
+      seq: 1,
+      ...over,
+    });
+    const { id } = await addAuthor({
+      'SamvatTran.Rows': [samvat({ Remark: 'keep', seq: 1 }), samvat({ Remark: 'drop', seq: 2 })],
+    });
+    const keys = async () =>
+      (
+        await sql<{ k: number; r: string }>`
+          SELECT AuthorSamvatKm AS k, Remark AS r FROM AuthorSamvatT WHERE AuthorKt = ${id} ORDER BY seq`.execute(
+          trx,
+        )
+      ).rows.map((r) => ({ k: Number(r.k), r: r.r }));
+    const [keep, drop] = await keys();
+    expect([keep!.r, drop!.r]).toEqual(['keep', 'drop']);
+
+    // Another author refers to each row; this author refers to the row that stays.
+    const other = async (ref: number) =>
+      Number(
+        (
+          await one(sql<{ id: number }>`
+            INSERT INTO authmast (authorname, recordno, donebykt, RefSamvatKt) OUTPUT INSERTED.authorcokm AS id
+            VALUES ('Ref', ${(await nextRecordNo()) + ref}, ${doneByKt}, ${ref})`)
+        ).id,
+      );
+    const refKeep = await other(keep!.k);
+    const refDrop = await other(drop!.k);
+    const ref = async (author: number) =>
+      (
+        await one(
+          sql<{
+            r: number | null;
+          }>`SELECT RefSamvatKt AS r FROM authmast WHERE authorcokm = ${author}`,
+        )
+      ).r;
+
+    const res = await alice.post(`${API}/save`).send({
+      id,
+      fields: {
+        authorname: 'Muni Test',
+        recordno: (
+          await one(sql<{ n: number }>`SELECT recordno AS n FROM authmast WHERE authorcokm = ${id}`)
+        ).n,
+        donebykt: doneByKt,
+        RefSamvatKt: keep!.k,
+        'SamvatTran.Rows': [
+          samvat({ AuthorSamvatKm: keep!.k, Remark: 'kept and edited', Vksamvat: 1501, seq: 1 }),
+          samvat({ Remark: 'new', seq: 2 }),
+        ],
+      },
+    });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    const after = await keys();
+    // The kept row keeps its key and takes the edit; the dropped one is gone; the new one is new.
+    expect(after).toHaveLength(2);
+    expect(after[0]).toEqual({ k: keep!.k, r: 'kept and edited' });
+    expect(after[1]!.r).toBe('new');
+    expect([keep!.k, drop!.k]).not.toContain(after[1]!.k);
+    // References to the kept row stay (this author's own too); the one to the removed row is cleared.
+    expect(await ref(id)).toBe(keep!.k);
+    expect(await ref(refKeep)).toBe(keep!.k);
+    expect(await ref(refDrop)).toBeNull();
+
+    // A save that never opened the popup leaves the rows alone.
+    await alice.post(`${API}/save`).send({
+      id,
+      fields: { authorname: 'Muni Test', recordno: res.body.row.recordno, donebykt: doneByKt },
+    });
+    expect(await keys()).toEqual(after);
+  });
+
+  it('lists the Library Nos the selected authors refer to (Show In Use › BookT, v3.4.3.1)', async () => {
+    const { rows: books } = await sql<{
+      tid: number;
+    }>`SELECT TOP 3 tid FROM BookT ORDER BY tid`.execute(trx);
+    const [nameRef, printed, notPrinted] = books.map((b) => Number(b.tid));
+    const { id } = await addAuthor({
+      AuthorNameRefBookTKt: nameRef,
+      'SamvatTran.Rows': [
+        {
+          AuthorSamvatKm: 0,
+          SamvatKindKt: samvatKindKt,
+          SamvatKindName: 'दी.सं.',
+          Vksamvat: 1500,
+          BookTKt: printed,
+          IsPrint: true,
+          seq: 1,
+        },
+        {
+          AuthorSamvatKm: 0,
+          SamvatKindKt: samvatKindKt,
+          SamvatKindName: 'दी.सं.',
+          Vksamvat: 1500,
+          BookTKt: notPrinted,
+          IsPrint: false,
+          seq: 2,
+        },
+      ],
+    });
+    const found = await alice.post(`${API}/action/in-use-book-t`).send({ ids: [id] });
+    expect(found.status, JSON.stringify(found.body)).toBe(200);
+    expect(found.body).toMatchObject({ kind: 'open', screen: 'book-tran', emptyMessage: '' });
+    expect([...(found.body.ids as number[])].sort((a, b) => a - b)).toEqual(
+      [nameRef, printed].sort((a, b) => a! - b!),
+    );
+    const none = await alice.post(`${API}/action/in-use-book-t`).send({ ids: [] });
+    expect(none.body.ids).toEqual([]);
+  });
+
   it('refuses to delete an author in use, and logs a delete', async () => {
     const used = await addAuthor({
       'AuthMAnyNmTran.Rows': [{ AuthAnyaNmKm: -1, AnyaName: 'Alt', Seq: 1 }],

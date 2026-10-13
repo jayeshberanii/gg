@@ -5,6 +5,7 @@ import { UserType } from '@gglib/shared';
 import { useMemo, useRef, useState } from 'react';
 import type { ContextMenuItem } from '@/components/ui/ContextMenu';
 import { InputBox } from '@/components/ui/InputBox';
+import { ToolButton, ToolSeparator } from '@/components/ui/Modal';
 import { useMessageBox } from '@/components/ui/MessageBox';
 import { PickListDialog, type PickResult } from '@/components/ui/PickListDialog';
 import { useAuth } from '@/features/auth/AuthProvider';
@@ -23,6 +24,7 @@ import type { MasterState } from '@/features/master/useMasterScreen';
 import { api, errorMessage } from '@/lib/api';
 import { getVikramSamvat } from './AuthorMaster';
 import { buildKrutiTree, type KrutiNode, KrutiTree, krutiTreeText } from './KrutiTree';
+import { type KrutiWorkFilter, KrutiWorkFilterDialog } from './KrutiWorkFilterDialog';
 import type { ScreenProps } from './registry';
 
 /**
@@ -767,7 +769,9 @@ function buildSpec(deps: Deps): ScreenSpec {
       { header: 'अंतवाक्य', field: 'antvakya', width: 150 },
       { header: 'विभाग', field: 'Vibhag', width: 100 },
       { header: 'PNo', field: 'pno', width: 100 },
-      { header: 'कर्ता2', field: 'SAuthor', width: 250 },
+      // v3.4.3.1: कर्ता2 (SAuthor) gave way to Sampraday and Remark.
+      { header: 'Sampraday', field: 'SampradayTran', width: 200 },
+      { header: 'Remark', field: 'remark', width: 100 },
     ],
     onFieldLeave,
     // Menu items' ShortcutKeys: Toggle MultiSelect (Ctrl+T), Insert Ref Library No (Ctrl+9).
@@ -829,9 +833,13 @@ type Dialog =
       defaultValue?: string;
       resolve: (v: string | null) => void;
     }
-  | { kind: 'group'; table: TransGrid; viewOnly: boolean; current: number; groupName: string };
+  | { kind: 'group'; table: TransGrid; viewOnly: boolean; current: number; groupName: string }
+  | { kind: 'work-filter'; resolve: (filter: KrutiWorkFilter | null) => void };
 
-/** cntMenu_Opening: Print Report for Admin / AMaster and these user ids. */
+/**
+ * cntMenu_Opening: Print Report for Admin / AMaster and these user ids. (v3.4.3.1 replaces this
+ * rule by the ContextMenu permission tables, which this database does not have yet.)
+ */
 const PRINT_USER_IDS = [22, 29, 54, 64, 38, 182];
 
 // const NOT_ON_WEB = (what: string) =>
@@ -846,6 +854,11 @@ export function KrutiMaster(props: ScreenProps) {
   const [treeSelected, setTreeSelected] = useState<number | null>(null);
   /** The up-level lists are 45k rows: loaded once per window. */
   const lists = useRef(new Map<string, PickList>());
+  /**
+   * boolAskForAdminLockPassword: LockByAdmin asks its password only until one run got through.
+   * The web keeps what was typed for the window and sends it again; the API checks it each time.
+   */
+  const adminLockPassword = useRef<string | null>(null);
 
   const namedList = (name: string) => async () => {
     const cached = lists.current.get(name);
@@ -966,6 +979,14 @@ export function KrutiMaster(props: ScreenProps) {
     );
   }
 
+  /** btnAdminLock / btnAdminUnlock: LockByAdmin(True / False). */
+  async function lockByAdmin(a: ScreenActions, lock: boolean) {
+    if (!(await a.confirm(`Are You Sure To ${lock ? 'Lock' : 'Unlock'} Selected Records?`))) return;
+    const password = adminLockPassword.current ?? (await a.askPassword());
+    if (password === null) return;
+    if (await a.run('lock-by-admin', { lock, password })) adminLockPassword.current = password;
+  }
+
   const spec = useMemo(
     () =>
       buildSpec({
@@ -999,7 +1020,8 @@ export function KrutiMaster(props: ScreenProps) {
       (user.userType === UserType.Admin ||
         user.userType === UserType.AMaster ||
         PRINT_USER_IDS.includes(user.id));
-    const adminLock = user !== null && (user.isAdmin || user.userType === UserType.AMaster);
+    // cntMenu_Opening: Replace Records for IsAdminLogin and AMaster (the API refuses the rest).
+    const replaceRecords = user !== null && (user.isAdmin || user.userType === UserType.AMaster);
 
     const sampraday = () => pick('Sampraday', namedList('kruti-sampraday'));
     const krutisOf = async (sampradayKt: number) =>
@@ -1056,10 +1078,44 @@ export function KrutiMaster(props: ScreenProps) {
 
     const noteColumns = async () => pick('Column No', namedList('kruti-cols'));
 
+    /** FindAndReplace(Type, …): the type to replace among the selected krutis', then the new one. */
+    const findAndReplace = (kind: 'Ktype' | 'Purn') => async () => {
+      const from = await pick(kind, async () =>
+        tableList(await a.call('vishesh-of', { kind }, selected)),
+      );
+      if (code(from) <= 0) return;
+      const to = await pick(kind, namedList(kind === 'Ktype' ? 'replace-ktype' : 'replace-purn'));
+      if (code(to) <= 0) return;
+      await a.run('replace-vishesh', { kind, from: code(from), to: code(to) }, selected);
+    };
+
+    /**
+     * Replace In Selected › कर्ता 1 › Author / Avastha: the Security password, what to replace
+     * among the selected krutis', then what with. Both picks are needed (see the doc).
+     */
+    const replaceInAuthors = (kind: 'author' | 'avastha') => async () => {
+      const password = await a.askPassword();
+      if (password === null) return;
+      const title = kind === 'author' ? 'Author' : 'Avastha';
+      const from = await pick(title, async () =>
+        tableList(
+          await a.call(kind === 'author' ? 'authors-of' : 'avasthas-of', undefined, selected),
+        ),
+      );
+      if (code(from) <= 0) return;
+      const to = await pick(title, namedList(kind === 'author' ? 'authors' : 'avasthas'));
+      if (code(to) <= 0) return;
+      await a.run(
+        kind === 'author' ? 'replace-author' : 'replace-avastha',
+        { from: code(from), to: code(to), password },
+        selected,
+      );
+    };
+
     const items: ContextMenuItem[] = [
       {
         kind: 'submenu',
-        label: 'Show For Selected  Kruti ',
+        label: 'For Selected  Kruti ',
         items: [
           item('BookM', run('book-master', undefined, selected)),
           item('Author Card', async () => {
@@ -1067,8 +1123,10 @@ export function KrutiMaster(props: ScreenProps) {
             await a.run('author-card', { krutiOnly }, selected);
           }),
           item('Swarop', run('swarop-master', undefined, selected)),
-          item('Vibhag', run('vibhag-master', { gridIds: a.gridIds })),
+          item('Vibhag', run('vibhag-master', undefined, selected)),
           item('Party Master(Bhandar)', run('party-master', undefined, selected)),
+          item('TirthRaksha Master', run('tirth-raksha-master', undefined, selected)),
+          { kind: 'separator' },
           {
             kind: 'submenu',
             label: 'Utility',
@@ -1079,17 +1137,31 @@ export function KrutiMaster(props: ScreenProps) {
                 );
                 if (answer !== 'cancel') await a.run('check-nsmp', { nsmp: answer === 'yes' });
               }),
-              ...(adminLock
-                ? (['Lock By Admin', 'Unlock By Admin'] as const).map((label) =>
-                    item(label, async () => {
-                      const password = await a.askPassword();
-                      if (password !== null)
-                        await a.run('lock-by-admin', { lock: label === 'Lock By Admin', password });
-                    }),
-                  )
-                : []),
+              // The typed text goes in front of the remark, as on the desktop.
+              item('Append Remark', async () => {
+                const typed = await ask('Please Enter Remark');
+                if (typed) await a.run('append-remark', { text: typed }, selected);
+              }),
             ],
           },
+          ...(replaceRecords
+            ? [
+                {
+                  kind: 'submenu',
+                  label: 'Replace Records',
+                  items: [
+                    item('कृति परि. नाम', async () => {
+                      const search = await ask('Enter Existing Text');
+                      if (!search) return;
+                      const replace = await ask('Enter New Replace Text');
+                      if (replace) await a.run('replace-name', { search, replace }, selected);
+                    }),
+                    item('प्रकार', findAndReplace('Ktype')),
+                    item('पूर्णता', findAndReplace('Purn')),
+                  ],
+                } satisfies ContextMenuItem,
+              ]
+            : []),
         ],
       },
       // {
@@ -1251,6 +1323,7 @@ export function KrutiMaster(props: ScreenProps) {
         kind: 'submenu',
         label: 'Utility',
         items: [
+          // 'Mark Samprad As Complete' (v3.4.3.1) has an empty handler on the desktop: left out.
           // {
           //   kind: 'item',
           //   label: 'Toggle MultiSelect',
@@ -1262,14 +1335,14 @@ export function KrutiMaster(props: ScreenProps) {
             kind: 'submenu',
             label: 'Replace In Selected ',
             items: [
-              item('Author', async () => {
-                const from = await pick('Author', async () =>
-                  tableList(await a.call('authors-of', undefined, selected)),
-                );
-                const to = await pick('Author', namedList('authors'));
-                await a.run('replace-author', { from: code(from), to: code(to) }, selected);
-                await state.reload();
-              }),
+              {
+                kind: 'submenu',
+                label: 'कर्ता 1',
+                items: [
+                  item('Author', replaceInAuthors('author')),
+                  item('Avastha', replaceInAuthors('avastha')),
+                ],
+              },
               item('Kruticolkt in KrutiNoteT', async () => {
                 const col = await noteColumns();
                 if (!col) return;
@@ -1519,6 +1592,30 @@ export function KrutiMaster(props: ScreenProps) {
       //   const to = await pick('Head', namedList('heads'));
       //   if (to) await a.run('update-swarop-head', { from: code(from), to: code(to) }, selected);
       // }),
+      {
+        kind: 'submenu',
+        label: 'Filter',
+        items: [
+          // The filtered list stays until Refresh (FillList with StrId set for this one load).
+          item('Show Records By Work', async () => {
+            const filter = await new Promise<KrutiWorkFilter | null>((resolve) =>
+              setDialog({ kind: 'work-filter', resolve }),
+            );
+            if (!filter) return;
+            await a.run(
+              'show-by-work',
+              {
+                from: filter.from,
+                to: filter.to,
+                workTypes: filter.workTypes.join(','),
+                sampradays: filter.sampradays.join(','),
+                users: filter.users.join(','),
+              },
+              [],
+            );
+          }),
+        ],
+      },
     );
     return items;
   }
@@ -1529,6 +1626,27 @@ export function KrutiMaster(props: ScreenProps) {
         spec={spec}
         {...props}
         menu={menu}
+        // AdminLockToolStrip (668, 304; 64x25): Visible for AMaster only (Form_Load).
+        inPanel={(a, _state, x) =>
+          user?.userType === UserType.AMaster ? (
+            <div
+              className="win-toolstrip absolute"
+              style={{ left: x(668), top: 304, width: 64, height: 25, backgroundColor: 'red' }}
+            >
+              <ToolButton
+                icon="lock"
+                label="Lock By Admin"
+                onClick={() => void lockByAdmin(a, true)}
+              />
+              <ToolSeparator />
+              <ToolButton
+                icon="lock-open"
+                label="Unlock By Admin"
+                onClick={() => void lockByAdmin(a, false)}
+              />
+            </div>
+          ) : null
+        }
         gridOverride={(a, state) =>
           tree ? (
             <KrutiTree
@@ -1575,6 +1693,20 @@ export function KrutiMaster(props: ScreenProps) {
             const d = dialog;
             setDialog(null);
             d.resolve(null);
+          }}
+        />
+      )}
+      {dialog?.kind === 'work-filter' && (
+        <KrutiWorkFilterDialog
+          onClose={() => {
+            const d = dialog;
+            setDialog(null);
+            d.resolve(null);
+          }}
+          onSearch={(filter) => {
+            const d = dialog;
+            setDialog(null);
+            d.resolve(filter);
           }}
         />
       )}

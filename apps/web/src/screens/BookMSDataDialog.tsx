@@ -17,29 +17,29 @@ import { getVikramSamvat } from './AuthorMaster';
 
 type Box = { name: string; x: number; y: number; w: number; kt?: string };
 
-/** frmBookMSData.Designer.vb (96 DPI). */
+/** frmBookMSData.Designer.vb (96 DPI), as of desktop v3.4.3.1. */
 const BOXES: Box[] = [
   { name: 'bhandarcokt', x: 121, y: 30, w: 164, kt: 'BhandarcoName' },
-  { name: 'Hastpratno', x: 414, y: 30, w: 125 },
-  { name: 'HastpratSize', x: 653, y: 30, w: 131 },
-  { name: 'panktiAkshar', x: 885, y: 30, w: 128 },
+  { name: 'Hastpratno', x: 411, y: 30, w: 121 },
+  { name: 'HastpratSize', x: 641, y: 30, w: 131 },
+  { name: 'panktiAkshar', x: 888, y: 30, w: 125 },
   { name: 'PLSthalkt', x: 121, y: 66, w: 92, kt: 'PLSthalName' },
   { name: 'LSamvcokt', x: 214, y: 66, w: 71, kt: 'LsamvcoName' },
-  { name: 'LSamvat', x: 415, y: 66, w: 55 },
-  { name: 'LSamvatVK', x: 471, y: 66, w: 69 },
-  { name: 'AdiVakya', x: 653, y: 66, w: 131 },
-  { name: 'AntVakya', x: 885, y: 66, w: 128 },
+  { name: 'LSamvat', x: 412, y: 66, w: 55 },
+  { name: 'LSamvatVK', x: 468, y: 66, w: 64 },
+  { name: 'AdiVakya', x: 641, y: 66, w: 131 },
+  { name: 'AntVakya', x: 888, y: 66, w: 125 },
 ];
 
 const LABELS: [string, number, number][] = [
   ['Bhandar Name', 6, 34],
   ['Hastprat No', 287, 34],
-  ['Hastprat Size', 542, 34],
-  ['Pankti Aksr', 789, 34],
+  ['Hastprat Size', 532, 34],
+  ['Pankti Akshar', 775, 34],
   ['LSthal/Samvat', 6, 70],
   ['LSamvatYr/VK', 287, 70],
-  ['Adi Vakya', 542, 70],
-  ['Ant Vakya', 789, 70],
+  ['Adi Vakya', 532, 70],
+  ['Ant Vakya', 775, 70],
 ];
 
 const isNumeric = (s: string) => /^\s*[+-]?(\d+\.?\d*|\.\d+)\s*$/.test(s);

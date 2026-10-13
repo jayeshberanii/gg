@@ -29,6 +29,7 @@ import {
   treeText,
 } from './AuthorTree';
 import type { ScreenProps } from './registry';
+import { BookTranDialog } from './BookTranDialog';
 
 /**
  * Master › Author Master (frmAuthorMaster). See docs/screens/author-master.md.
@@ -556,6 +557,8 @@ function buildSpec(showPopup: (d: Dialog) => void): ScreenSpec {
         at: { x: 145, y: 138, w: 115 },
         kt: true,
         nameColumn: 'SampradayName',
+        // v3.4.3.1: txtSampradaykt.Enabled = False — loaded and saved, never typed in or picked.
+        alwaysDisabled: true,
       },
       tran('SampradayTran', 262, 138, 101),
       { name: 'KrutiTran', at: { x: 522, y: 137, w: 177 }, transList: 'KrutiTran' },
@@ -631,6 +634,8 @@ export function AuthorMaster(props: ScreenProps) {
   /** tvTree: shown instead of dgMain once "Display In Tree" is chosen. */
   const [tree, setTree] = useState<TreeNode[] | null>(null);
   const [treeSelected, setTreeSelected] = useState<number | null>(null);
+  /** For Selected Record › BookT: the Library No dialog's rows. */
+  const [bookTids, setBookTids] = useState<number[] | null>(null);
 
   /** clsCom.DisplayListForm over one of the form's fixed lists. */
   function pickFrom(name: string, title: string, selectFirst: boolean): Promise<PickResult | null> {
@@ -735,6 +740,12 @@ export function AuthorMaster(props: ScreenProps) {
             'English Book Vishesh',
             run('in-use-english-book-vishesh', undefined, inOrder(a.selectedIds)),
           ),
+          // v3.4.3.1: frmBookTranNew as a dialog over the Library Nos the selected authors
+          // refer to; it opens empty when there are none.
+          item('BookT', async () => {
+            const result = await a.call('in-use-book-t', undefined, inOrder(a.selectedIds));
+            if (result?.kind === 'open') setBookTids(result.ids.length > 0 ? result.ids : [0]);
+          }),
         ],
       },
       // item('Find Missing RecNo', run('find-missing-recno', { gridIds: a.gridIds }, [])),
@@ -904,6 +915,9 @@ export function AuthorMaster(props: ScreenProps) {
           ) : null
         }
       />
+      {bookTids && (
+        <BookTranDialog bookId={0} tids={bookTids} showAll onClose={() => setBookTids(null)} />
+      )}
       {dialog?.kind === 'pick' && (
         <PickListDialog
           title={dialog.title}

@@ -201,4 +201,58 @@ describe.skipIf(!hasDb)('Sampraday Master via the master engine (integration)', 
     const none = await h.user.post(`${API}/action/in-use-magazine`).send({ ids: [child] });
     expect(none.body).toMatchObject({ ids: [], emptyMessage: 'No Records Found' });
   });
+  it('searches a popup column with F3 "Not In": records with other rows and with none (UcSearch v3.4.3.1)', async () => {
+    const authors = (
+      await sql<{
+        id: number;
+      }>`SELECT TOP 2 authorcokm AS id FROM authmast ORDER BY authorcokm`.execute(h.trx)
+    ).rows.map((r) => Number(r.id));
+    const add = async (name: string, author?: number) => {
+      const res = await save(0, {
+        SampradayName: name,
+        ...(author
+          ? {
+              'SampradayAdyaSthapakTran.Rows': [
+                { SampradayAdyaSthapakKm: 0, AuthorKt: author, AdyaSthapak: 'x', Seq: 1 },
+              ],
+            }
+          : {}),
+      });
+      expect(res.status, JSON.stringify(res.body)).toBe(200);
+      return res.body.id as number;
+    };
+    const withFirst = await add('zq-notin-first', authors[0]);
+    const withSecond = await add('zq-notin-second', authors[1]);
+    const withNone = await add('zq-notin-none');
+
+    const meta = (await h.user.get(`${API}/meta`)).body as MasterMeta;
+    const col = meta.searchColumns.find((c) => c.columnName === 'SampradayAdyaSthapakTran')!;
+    const search = async (notIn: boolean) =>
+      (
+        (
+          await h.user.post(`${API}/search`).send({
+            columnId: col.id,
+            scope: 'all',
+            gridIds: [],
+            notIn,
+            values: [String(authors[0])],
+            text: '',
+          })
+        ).body as GridRow[]
+      ).map((r) => Number(r.SampradayKm));
+
+    const inIds = await search(false);
+    expect(inIds).toContain(withFirst);
+    expect(inIds).not.toContain(withSecond);
+    expect(inIds).not.toContain(withNone);
+
+    const notInIds = await search(true);
+    expect(notInIds).not.toContain(withFirst);
+    expect(notInIds).toContain(withSecond);
+    // The old two-clause form left out a record with no founder row at all.
+    expect(notInIds).toContain(withNone);
+    // Together the two searches are the whole table.
+    const total = await h.scalar(sql`SELECT COUNT(*) FROM Sampraday`);
+    expect(inIds.length + notInIds.length).toBe(total);
+  });
 });

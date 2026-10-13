@@ -116,9 +116,9 @@ export const partyMaster: ScreenDefinition = {
   table: 'PartyM',
   primaryColumn: 'partyMkm',
   lockable: false,
-  // Save logs Edit only (the Add call is commented out); Delete logs nothing.
+  // insertworkreports after Add (since v3.4.3.1) and Edit; Delete logs nothing.
   workReport: true,
-  workReportOn: { add: false, delete: false },
+  workReportOn: { delete: false },
 
   validate: (f) => (trimmed(f.PName) === '' ? 'Please Enter Party Name' : ''),
 

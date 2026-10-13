@@ -103,11 +103,16 @@ export type PickList = { columns: string[]; rows: GridValue[][] };
  */
 const ids = z.array(z.number().int()).max(1_000_000);
 
+/** The form's own switches (Work Report's Display Count, Book Master's Search Not In OB). */
+const listParams = z
+  .record(z.string(), z.union([z.string().max(100), z.number(), z.boolean()]))
+  .optional();
+
 export const listRequestSchema = z.object({
   /** StrId: only these records (e.g. opened from another screen's "Show In Use"). */
   ids: ids.optional(),
-  /** The form's own FillList switches (Work Report's Display Count), for a screen that has them. */
-  params: z.record(z.string(), z.union([z.string().max(100), z.number(), z.boolean()])).optional(),
+  /** The form's own FillList switches, for a screen that has them. */
+  params: listParams,
 });
 
 export const searchValuesRequestSchema = z.object({
@@ -125,12 +130,15 @@ export const searchRequestSchema = z.object({
   /** Values picked from the F2 list, or none to search by the typed text. */
   values: z.array(z.string()).max(10_000),
   text: z.string().max(1000),
+  /** The form's switches that are part of its DefaultCondition (ToolbarCheckbox.listSwitch). */
+  params: listParams,
 });
 
 export const rangeRequestSchema = z.object({
   columnId: z.number().int(),
   from: z.string().max(50),
   to: z.string().max(50),
+  params: listParams,
 });
 
 export const blankRequestSchema = z.object({
@@ -139,6 +147,7 @@ export const blankRequestSchema = z.object({
   blank: z.boolean(),
   /** "Do You Want to Search Within Grid?" answered Yes: limit to these. */
   withinIds: ids.optional(),
+  params: listParams,
 });
 
 export const securedIdsRequestSchema = z.object({
@@ -179,6 +188,8 @@ export const actionRequestSchema = z.object({
   params: z
     .record(z.string(), z.union([z.string().max(10_000), z.number(), z.boolean(), ids]))
     .optional(),
+  /** The form's ticked switches (ToolbarCheckbox.listSwitch), for an action that lists rows. */
+  switches: listParams,
 });
 
 /**

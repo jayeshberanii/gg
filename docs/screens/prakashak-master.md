@@ -28,7 +28,7 @@ text), `SamudayKt`, `Sampark`, `StatusKt`, plus:
 
 - `txtPrakName` = name, then `Cont(<contacts>)` and `AName(<any names>)` — from the popups'
   rows as the user left them, or else as stored;
-- `txtAuthor` = `GetAuthorName`: per author row, its types (`authtyattr` + sign short name)
+- `txtAuthor` = `GetAuthorName`: per author row, its types (the type's name, `authortype` — `authtyattr` up to v3.3.3.6 — + sign short name)
   and names (any name or author name, `(Guru)`, `[Identity-avastha]`, sign short name),
   joined by "-" and ","; kept as stored when the Author popup was not opened.
 
@@ -113,3 +113,15 @@ Selected Records (Ctrl+L / Ctrl+U still work).
   record, popups kept on a plain edit, duplicate recordno, nested authors and txtAuthor,
   delete with the author tables, menu actions (mark, finance, duplicates, print-contact format,
   active only, in-use).
+
+## Desktop v3.4.3.1
+
+- **Author-type text.** The denormalised author text is built from the type's name
+  (`authtype.authortype`) instead of its attribute (`authtype.authtyattr`), and the
+  author-type pick list (multiauthortype) shows two columns (`authtycokm`, `authortype`) —
+  the attribute column is gone. Text stored earlier keeps the old attribute until the record
+  is saved again (the desktop does not rewrite it either).
+  (`PrakMastRepository.GetAuthorName:224`; `authorText` in `prakashak.ts`, shared with Tirth
+  Raksha and Anya Bhandar.)
+- Not carried over yet: `visheshMast.remark` → `Vibhag` (the DB still has `remark`).
+- Not fixed on the desktop: the Finished reset (the web's fix stands).

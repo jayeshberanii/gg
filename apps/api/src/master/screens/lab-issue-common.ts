@@ -62,13 +62,17 @@ export async function labIssueValidation(
 
 /**
  * GetUserNotReturnedBook: '' unless the party (`forKt` > 0), or else the user, holds books
- * delivered more than 30 days ago and not returned.
+ * delivered more than 30 days ago and not returned. Desktop v3.4.3.1 commented the body out
+ * ("Temporary Comment Suggested by Vishalbhai"), so the check runs only while `enabled`
+ * (env LAB_ISSUE_OLD_DUE_BLOCK, off by default).
  */
 export async function userNotReturnedBook(
   db: Executor,
   userId: number,
   forKt: number,
+  enabled: boolean,
 ): Promise<string> {
+  if (!enabled) return '';
   const n = int(
     await scalar(
       db,
@@ -101,8 +105,8 @@ export async function insertLabRequest(
 
 /**
  * RequestForLabIssue (frmBookTranNew, frmPatrika, frmHastpratLibNoTran, frmGraphicMaster): for
- * each selected item, GetValidationMessage, then GetUserNotReturnedBook, then Save. The first
- * message stops the loop (the requests saved before it stay, as on the desktop, which has no
+ * each selected item, GetValidationMessage, then GetUserNotReturnedBook (while `oldDueBlock`,
+ * env LAB_ISSUE_OLD_DUE_BLOCK), then Save. The first message stops the loop (the requests saved before it stay, as on the desktop, which has no
  * transaction); "Book Issued Successfully" once anything was saved and nothing stopped it.
  */
 export async function requestLabIssue(
@@ -111,12 +115,13 @@ export async function requestLabIssue(
   items: { id: number; name: string }[],
   forKt: number,
   type: LabIssueType,
+  oldDueBlock: boolean,
 ): Promise<string> {
   let saved = 0;
   for (const item of items) {
     const problem =
       (await labIssueValidation(db, { id: 0, bookTKt: item.id, name: item.name, type })) ||
-      (await userNotReturnedBook(db, userId, forKt));
+      (await userNotReturnedBook(db, userId, forKt, oldDueBlock));
     if (problem) return problem;
     await insertLabRequest(db, { bookTKt: item.id, userId, forKt, type });
     saved++;

@@ -40,9 +40,10 @@ export type Harness = {
 
 /**
  * The master screens' integration setup: the app on a transaction of the real DB, with a user
- * and an admin signed in, all rolled back after every test. Call inside a `describe`.
+ * and an admin signed in, all rolled back after every test. Call inside a `describe`. `env`:
+ * settings the tests need other than the defaults (LAB_ISSUE_OLD_DUE_BLOCK).
  */
-export function useMasterHarness(): Harness {
+export function useMasterHarness(opts: { env?: Record<string, string> } = {}): Harness {
   let db: Database;
   let app: NestExpressApplication;
   let stamp = 0;
@@ -78,6 +79,9 @@ export function useMasterHarness(): Harness {
       SECURITY_PASSWORD: SECURITY,
       ISSUE_REPLACE_PASSWORD: ISSUE_REPLACE,
       GRAPHICS_LOCK_PASSWORD: GRAPHICS_LOCK,
+      // The desktop's default (v3.4.3.1), whatever the developer's .env says.
+      LAB_ISSUE_OLD_DUE_BLOCK: 'false',
+      ...opts.env,
     });
     const moduleRef = await Test.createTestingModule({ imports: [AppModule.forRoot(env)] })
       .overrideProvider(KYSELY)

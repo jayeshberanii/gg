@@ -42,6 +42,8 @@ test('shows the desktop layout and starts a new author at the next RecordNo', as
   await expect(win.getByRole('checkbox', { name: 'Guru' })).toBeVisible();
 
   await win.getByRole('button', { name: 'New' }).click();
+  // Desktop v3.4.3.1: txtSampradaykt.Enabled = False, even while adding.
+  await expect(win.getByLabel('Sampradaykt', { exact: true })).toBeDisabled();
   await expect(win.getByLabel('recordno')).not.toHaveValue('');
   await win.getByLabel('recordno').pressSequentially('x');
   await expect(win.getByLabel('recordno')).not.toHaveValue(/x/);
@@ -118,4 +120,21 @@ test('asks for the work type after modifying an existing author', async ({ page 
   await page.getByLabel('Search Work Type').fill('Modify');
   await page.getByLabel('Search Work Type').press('Enter');
   await expect(types).toBeHidden();
+});
+
+test('Author Type Master: no Attribute box or column, IsPrint beside the toolbar (v3.4.3.1)', async ({
+  page,
+}) => {
+  await login(page, scenario.users.reporter);
+  await openMenuItem(page, 'Master', 'Author Type Master');
+  const win = page.getByRole('region', { name: 'Author Type Master' });
+  await expect(win.getByLabel('Name', { exact: true })).toBeVisible();
+  await expect(win.getByText('Attribute', { exact: true })).toHaveCount(0);
+  await expect(win.getByRole('columnheader', { name: 'AuthAttr' })).toHaveCount(0);
+  await expect(win.getByRole('columnheader', { name: 'Brief' })).toBeVisible();
+  const isPrint = win.getByRole('checkbox', { name: 'IsPrint' });
+  await expect(isPrint).toBeVisible();
+  // On the toolbar strip, above the panel's first box.
+  const boxTop = (await win.getByLabel('Name', { exact: true }).boundingBox())!.y;
+  expect((await isPrint.boundingBox())!.y).toBeLessThan(boxTop);
 });

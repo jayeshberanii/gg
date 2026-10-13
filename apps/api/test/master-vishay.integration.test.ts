@@ -76,6 +76,19 @@ describe.skipIf(!hasDb)('Vishay Master via the master engine (integration)', () 
     ).toBe(1);
   });
 
+  it('refuses a name another subject already has, on add and on edit (v3.4.3.1)', async () => {
+    const a = (await save(0, { vishay_nm: 'વેબ ડુપ્લિકેટ A' })).body.id as number;
+    const b = (await save(0, { vishay_nm: 'વેબ ડુપ્લિકેટ B' })).body.id as number;
+    const again = await save(0, { vishay_nm: ' વેબ ડુપ્લિકેટ A ' });
+    expect(again.status).toBe(400);
+    expect(again.body.message).toBe('Vishay Name - વેબ ડુપ્લિકેટ A Already Exist');
+    const renamed = await save(b, { vishay_nm: 'વેબ ડુપ્લિકેટ A' });
+    expect(renamed.status).toBe(400);
+    expect(renamed.body.message).toBe('Vishay Name - વેબ ડુપ્લિકેટ A Already Exist');
+    // A record keeps its own name.
+    expect((await save(a, { vishay_nm: 'વેબ ડુપ્લિકેટ A', brif: 'x' })).status).toBe(200);
+  });
+
   it('replaces references instead of doubling them', async () => {
     const tk = await h.scalar(
       sql`SELECT ISNULL(MAX(ColumnMastkm), 0) AS n FROM columnmaster WHERE Vibhag = 'TableNm' AND Name = 'Vishay'`,
@@ -113,7 +126,7 @@ describe.skipIf(!hasDb)('Vishay Master via the master engine (integration)', () 
       expect(refused.body.message).toMatch(/^Record is in used in below forms\r\n/);
       expect(refused.body.message).toContain('- कृति विषय');
     }
-    const free = (await save(0, { vishay_nm: 'free' })).body.id as number;
+    const free = (await save(0, { vishay_nm: 'web free subject' })).body.id as number;
     expect(
       (await h.user.post(`${API}/delete`).send({ ids: [free], password: SECURITY })).status,
     ).toBe(204);

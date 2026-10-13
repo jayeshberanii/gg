@@ -125,5 +125,88 @@ test('adds a kruti, links an up level with F2, shows it in the tree, and deletes
   const security = dialog(page, 'Security');
   await security.getByLabel('Password').fill('e2e-security-pw');
   await security.getByRole('button', { name: 'Ok' }).click();
-  await answer(page, 'Records in used anthor plase !', 'OK');
+  // v3.4.3.1: every reason in one message.
+  await answer(page, /KrutiMstKm - \d+ is used in वि\.क्र\./, 'OK');
+});
+
+test('v3.4.3.1: the renamed menu, and Filter › Show Records By Work', async ({ page }) => {
+  // The whole list (every kruti) is loaded twice here.
+  test.setTimeout(150_000);
+  const win = await openScreen(page);
+  // A kruti added now has a work report of today.
+  await win.getByRole('button', { name: 'New' }).click();
+  await expect(win.getByLabel('KrutiNo', { exact: true })).not.toHaveValue('');
+  const name = `Zzqweb work ${Date.now() % 100000}`;
+  await win.getByLabel('extranm').fill(name);
+  await saveRecord(page);
+  const g = grid(page);
+  await expect(g.cell(0, 'extranm')).toContainText(name);
+
+  await g.cell(0, 'extranm').click({ button: 'right' });
+  await expect(page.getByRole('menuitem', { name: 'Show For Selected  Kruti' })).toHaveCount(0);
+  await page.getByRole('menuitem', { name: 'For Selected  Kruti' }).hover();
+  await expect(page.getByRole('menuitem', { name: 'TirthRaksha Master' })).toBeVisible();
+  // Replace Records is for IsAdmin and AMaster; Lock / Unlock By Admin left the menu.
+  await expect(page.getByRole('menuitem', { name: 'Replace Records' })).toHaveCount(0);
+  await page.getByRole('menuitem', { name: 'Utility', exact: true }).first().hover();
+  await expect(page.getByRole('menuitem', { name: 'Append Remark' })).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: 'Lock By Admin' })).toHaveCount(0);
+  // AdminLockToolStrip is for AMaster only.
+  await expect(win.getByRole('button', { name: 'Lock By Admin' })).toHaveCount(0);
+
+  await page.getByRole('menuitem', { name: 'Filter', exact: true }).hover();
+  await page.getByRole('menuitem', { name: 'Show Records By Work' }).click();
+  const filter = dialog(page, 'Kruti Work Filter');
+  await expect(filter).toBeVisible();
+  // Both DateTimePickers start on today.
+  await expect(filter.getByLabel('Work From Date')).toHaveValue(scenario.today);
+  await expect(filter.getByLabel('Work To Date')).toHaveValue(scenario.today);
+  // txtWorkType opens its list on any key; the box shows the chosen names.
+  await filter.getByLabel('Work Type').press('a');
+  const types = page.getByRole('listbox', { name: 'Work Type' });
+  await expect(types.getByRole('option').nth(1)).toBeVisible({ timeout: 30_000 });
+  await page.getByLabel('Search Work Type').fill('New');
+  await page.getByLabel('Search Work Type').press('Enter');
+  await expect(types).toBeHidden();
+  await expect(filter.getByLabel('Work Type')).toHaveValue(/New/);
+  // txtWorkDoneBy only on F2.
+  await filter.getByLabel('Work Done By').press('a');
+  await expect(page.getByRole('listbox', { name: 'Work Done By' })).toHaveCount(0);
+  await filter.getByRole('button', { name: 'Save' }).click();
+  await expect(filter).toBeHidden();
+  // The grid now holds the krutis worked on today; Refresh brings the whole list back.
+  await expect(g.cell(0, 'extranm')).toContainText(name);
+  await expect(g.cell(1, 'extranm')).toHaveCount(0);
+  await win.getByRole('button', { name: 'Refresh' }).click();
+  await expect(g.cell(1, 'extranm')).toHaveCount(1, { timeout: 60_000 });
+});
+
+test('v3.4.3.1: Lock / Unlock By Admin are panel buttons for AMaster, password asked once', async ({
+  page,
+}) => {
+  await login(page, scenario.users.amaster);
+  await openMenuItem(page, 'Library', 'Kruti Master');
+  const win = page.getByRole('region', { name: 'Kruti Master' });
+  const g = grid(page);
+  await expect(g.cell(0, 'extranm')).not.toBeEmpty({ timeout: 60_000 });
+  await g.cell(0, 'extranm').click();
+
+  await win.getByRole('button', { name: 'Lock By Admin', exact: true }).click();
+  await answer(page, 'Are You Sure To Lock Selected Records?', 'Yes');
+  const security = dialog(page, 'Security');
+  await security.getByLabel('Password').fill('e2e-kruti-lock-pw');
+  await security.getByRole('button', { name: 'Ok' }).click();
+  await answer(page, /\(\d+ \) Records Locked Successfully/, 'OK');
+
+  // boolAskForAdminLockPassword: not asked again in this window.
+  await win.getByRole('button', { name: 'Unlock By Admin', exact: true }).click();
+  await answer(page, 'Are You Sure To Unlock Selected Records?', 'Yes');
+  await answer(page, /\(\d+ \) Records UnLocked Successfully/, 'OK');
+  await expect(security).toHaveCount(0);
+
+  // Replace Records is in the menu for AMaster.
+  await g.cell(0, 'extranm').click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'For Selected  Kruti' }).hover();
+  await page.getByRole('menuitem', { name: 'Replace Records' }).hover();
+  await expect(page.getByRole('menuitem', { name: 'कृति परि. नाम' })).toBeVisible();
 });

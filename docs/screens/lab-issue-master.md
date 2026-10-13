@@ -494,3 +494,17 @@ id), Copy doing nothing (`noCopy`).
 
 Deferred: none specific to this screen. Send To › Patrika opens `patrika`, which shows the "not
 available on the web yet" window until Patrika is ported.
+
+## Desktop v3.4.3.1
+
+- **The "30 days old due books" block is off.** `LabIssueMRepository.GetUserNotReturnedBook`
+  (`:331-343`) has its whole body commented out ("Temporary Comment Suggested by Vishalbhai"), so
+  `You Cannot Issue any Books` / `Please Return<n>  Nos. of 30 days Old Due Books to Issue New Books.`
+  never appears: not on Save, not in Update For(Party), not in Request For LabIssue (Book Master's
+  Library No form, Patrika, Graphics Master, Graphics Detail).
+  Web: the check is kept behind the env flag `LAB_ISSUE_OLD_DUE_BLOCK` (`apps/api/.env.example`;
+  default `false`, i.e. the desktop's behaviour today). `true` brings the check back unchanged
+  (`userNotReturnedBook` in `lab-issue-common.ts`). The engine hands Save the server's settings
+  for it (`save(…, { env })`).
+- Tests: `master-lab-issue.integration.test.ts` — "does not hold 30-day-old due books …" (off)
+  and the second `describe`, run with the flag on.

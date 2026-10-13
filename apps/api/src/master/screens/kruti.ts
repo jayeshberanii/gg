@@ -974,6 +974,10 @@ export const krutiMaster: ScreenDefinition = {
   lockable: true,
   listJoin: JOIN,
   ucSearchColumns: true,
+  // v3.4.3.1: FillList binds dtMain("SampradayTran") and dtMain("Remark"); this database's
+  // tblSearch rows for them (722, 701) are
+  // not DisplayInGrid yet. (`remark` is qualified: listJoin's visheshMast aliases have one too.)
+  gridColumnsAlso: [{ column: 'SampradayTran' }, { column: 'remark', select: 'krutiMst.remark' }],
   decorateList: appendAnyNames,
   menuLayoutType: 'Kruti',
   workReport: true,
@@ -994,20 +998,24 @@ export const krutiMaster: ScreenDefinition = {
     return { KrutiNo: max > 0 ? max + 1 : 1 };
   },
 
-  // Delete(): the group's other members, then (after the password) an up level still linked.
+  // Delete(): the group's other members, then (after the password) every use that stops it, in
+  // one message (v3.4.3.1: Tirth Raksha, and the up level's new wording).
   async checkInUse(db, id) {
-    const others = Number(
-      (await scalar(
-        db,
-        sql`SELECT COUNT(*) FROM KrutiGroupT WHERE krutimstkt <> ${id}
-          AND groupno IN (SELECT groupno FROM KrutiGroupT WHERE krutimstkt = ${id})`,
-      )) ?? 0,
+    const n = async (q: RawBuilder<unknown>) => Number((await scalar(db, q)) ?? 0);
+    const others = await n(
+      sql`SELECT COUNT(*) FROM KrutiGroupT WHERE krutimstkt <> ${id}
+        AND groupno IN (SELECT groupno FROM KrutiGroupT WHERE krutimstkt = ${id})`,
     );
     if (others > 0) return "You can not delete Group's Master Record First Remove Group Member";
-    const rel = Number(
-      (await scalar(db, sql`SELECT COUNT(*) FROM krutiRelT WHERE krutimstkt = ${id}`)) ?? 0,
-    );
-    return rel > 0 ? 'Records in used anthor plase !' : '';
+    let reasons = '';
+    if (
+      (await n(sql`SELECT COUNT(*) FROM TirthRakshaKrutiT WHERE KrutiKt = ${id}`)) > 0 ||
+      (await n(sql`SELECT COUNT(*) FROM TirthRakshaReferenceT WHERE KrutiMstKt = ${id}`)) > 0
+    )
+      reasons += `\r\nKrutiMstKm - ${id} is used in TirthRaksha Master`;
+    if ((await n(sql`SELECT COUNT(*) FROM krutiRelT WHERE krutimstkt = ${id}`)) > 0)
+      reasons += `\r\nKrutiMstKm - ${id} is used in वि.क्र.`;
+    return reasons;
   },
 
   /**
@@ -1110,7 +1118,8 @@ export const krutiMaster: ScreenDefinition = {
     ),
     'kruti-sampraday-akaradi': list(sql`
       SELECT ColumnMastkm, Name FROM columnmaster WHERE Vibhag = 'KrutiSampraday'
-        AND Name IN (N'अकारादि लीस्ट', N'क आदि लीस्ट') ORDER BY Name`),
+        AND Name IN (N'अकारादि लीस्ट', N'क आदि लीस्ट', N'त, थ, द, ध, न आदि लीस्ट', N'ट, ठ, ड, ढ, ण आदि लीस्ट',
+          N'प, फ, ब, भ, म आदि लीस्ट', N'य, र, ल, व आदि लीस्ट', N'श, ष, स, ह आदि लीस्ट') ORDER BY Name`),
     'kruti-cols': list(sql`
       SELECT ColumnMastkm, CAST(ColumnNo AS varchar) AS ColumnNo, Name FROM columnmaster
       WHERE Vibhag LIKE 'KrutiCol' AND ColumnNo <> ''`),
@@ -1149,6 +1158,23 @@ export const krutiMaster: ScreenDefinition = {
     ),
     sampraday: list(
       sql`SELECT columnmastkm, Name FROM columnMaster WHERE Vibhag = 'KrutiSampraday' ORDER BY Name`,
+    ),
+    // v3.4.3.1 — Replace In Selected › कर्ता 1 › Avastha, Replace Records, the Kruti Work Filter.
+    // v3.4.3.1: remark -> Vibhag once the DB is upgraded
+    avasthas: list(
+      sql`SELECT Tid, Vishesh FROM visheshMast WHERE remark = 'Avastha' ORDER BY Vishesh`,
+    ),
+    // v3.4.3.1: remark -> Vibhag once the DB is upgraded
+    'replace-ktype': list(sql`
+      SELECT V.Tid AS Id, V.Vishesh AS Name FROM visheshMast V WHERE ISNULL(V.Vishesh, '') <> '' AND remark = 'Ktype' ORDER BY V.Vishesh`),
+    // v3.4.3.1: remark -> Vibhag once the DB is upgraded
+    'replace-purn': list(sql`
+      SELECT V.Tid AS Id, V.Vishesh AS Name FROM visheshMast V WHERE ISNULL(V.Vishesh, '') <> '' AND remark = 'Purn' ORDER BY V.Vishesh`),
+    'work-types': list(
+      sql`SELECT ColumnMastkm, Name FROM columnmaster WHERE Vibhag = 'WorkType' ORDER BY Name`,
+    ),
+    'work-users': list(
+      sql`SELECT tid, uname AS Name FROM Usecurity WHERE IsActive = 1 ORDER BY uname`,
     ),
     'pariman-types': list(sql`
       SELECT kp.parimantypkt, c.Name AS pariman FROM columnmaster c INNER JOIN krutiparimnT kp ON kp.parimantypkt = c.ColumnMastkm

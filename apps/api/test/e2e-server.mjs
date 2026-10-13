@@ -74,6 +74,8 @@ const users = {
   reporter: `e2erep${stamp}`,
   /** IsAdmin: sees the admin-only menus, skips attendance checks. */
   admin: `e2eadmin${stamp}`,
+  /** User type AMaster (5), not IsAdmin: Kruti Master's Lock / Unlock By Admin buttons. */
+  amaster: `e2eamast${stamp}`,
 };
 
 const freshId = await createUser(users.fresh);
@@ -107,6 +109,7 @@ for (const d of [threeBack, dayBefore, lastWorkingDay])
 
 await createUser(users.reporter, { userType: 1 });
 await createUser(users.admin, { userType: 1, admin: true });
+await createUser(users.amaster, { userType: 5 });
 
 await sql`SAVE TRANSACTION e2e_seed`.execute(trx);
 

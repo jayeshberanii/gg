@@ -79,6 +79,21 @@ describe.skipIf(!hasDb)('Column Master via the master engine (integration)', () 
     expect(up.rows.map((r) => r.UplevelKt)).toEqual([parent]);
   });
 
+  it('refuses a second record with the same Name and Vibhag (v3.4.3.1)', async () => {
+    const save = (id: number, fields: Record<string, unknown>) =>
+      h.admin.post(`${API}/save`).send({ id, fields });
+    const a = (await save(0, { Vibhag: 'WebDup', Name: 'Same' })).body.id as number;
+    const again = await save(0, { Vibhag: ' WebDup ', Name: 'Same ' });
+    expect(again.status).toBe(400);
+    expect(again.body.message).toBe('Recor Already Exist');
+    // The same Name under another Vibhag is fine, until it is moved onto the first one's.
+    const other = await save(0, { Vibhag: 'WebDup2', Name: 'Same' });
+    expect(other.status).toBe(200);
+    const moved = await save(other.body.id as number, { Vibhag: 'WebDup', Name: 'Same' });
+    expect(moved.body.message).toBe('Recor Already Exist');
+    expect((await save(a, { Vibhag: 'WebDup', Name: 'Same', Brief: 'b' })).status).toBe(200);
+  });
+
   it('saves references, colours their rows, and never deletes', async () => {
     const id = (
       await h.admin.post(`${API}/save`).send({

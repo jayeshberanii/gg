@@ -6,22 +6,18 @@ import type { ScreenProps } from './registry';
 
 /**
  * Master › Author Type Master (frmAuthorType). Field and column positions, widths and headers
- * are the ones in frmAuthorType.designer.vb.
+ * are the ones in frmAuthorType.designer.vb (v3.4.3.1: no Attribute box or column).
  */
 const spec: ScreenSpec = {
   screen: 'author-type-master',
-  panelHeight: 185,
+  panelHeight: 140,
   panelWidth: 1008,
+  // v3.4.3.1: chkIsPrint sits on the form itself at (768,27), over the toolbar strip.
+  toolbarCheckbox: { name: 'IsPrint', label: 'IsPrint', right: 166 },
   fields: [
     { name: 'authortype', label: 'Name', labelAt: { x: 13, y: 22 }, at: { x: 116, y: 18, w: 374 } },
-    {
-      name: 'authtyattr',
-      label: 'Attribute',
-      labelAt: { x: 13, y: 62 },
-      at: { x: 116, y: 58, w: 374 },
-    },
-    { name: 'brif', label: 'Brief', labelAt: { x: 13, y: 102 }, at: { x: 116, y: 98, w: 374 } },
-    { name: 'remark', label: 'Remark', labelAt: { x: 13, y: 142 }, at: { x: 116, y: 138, w: 374 } },
+    { name: 'brif', label: 'Brief', labelAt: { x: 13, y: 62 }, at: { x: 116, y: 58, w: 374 } },
+    { name: 'remark', label: 'Remark', labelAt: { x: 13, y: 102 }, at: { x: 116, y: 98, w: 374 } },
     {
       name: 'short_name',
       label: 'Short Name',
@@ -42,12 +38,10 @@ const spec: ScreenSpec = {
       labelAt: { x: 525, y: 102 },
       at: { x: 629, y: 98, w: 360 },
     },
-    { name: 'IsPrint', at: { x: 529, y: 143, w: 78 }, checkbox: 'IsPrint' },
   ],
   columns: [
     { header: 'Id', field: 'authtycokm', width: 80 },
     { header: 'Author Type', field: 'authortype' },
-    { header: 'AuthAttr', field: 'authtyattr' },
     { header: 'Brief', field: 'brif' },
     { header: 'Remark', field: 'remark', width: 130 },
     { header: 'Short Name', field: 'short_name' },

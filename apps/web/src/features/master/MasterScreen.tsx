@@ -37,6 +37,11 @@ export type MasterScreenExtras = {
    * record's Graphics Master row). It stays enabled while a record is edited.
    */
   aboveGrid?: (actions: ScreenActions, state: MasterState) => ReactNode;
+  /**
+   * Controls inside the fields panel that are not boxes (frmKrutiMasterNew's AdminLockToolStrip,
+   * a ToolStrip in SplitContainer1.Panel1). `x` scales a designer x position as the fields' are.
+   */
+  inPanel?: (actions: ScreenActions, state: MasterState, x: (v: number) => number) => ReactNode;
 };
 
 /**
@@ -90,6 +95,7 @@ function MasterWindow({
   menu,
   gridOverride,
   aboveGrid,
+  inPanel,
   scope,
 }: { spec: ScreenSpec; scope: ListScope } & ScreenProps & MasterScreenExtras) {
   const state = useMasterScreen(
@@ -244,6 +250,7 @@ function MasterWindow({
 
   const { call, run } = useActionRunner(spec.screen, {
     defaultIds: state.selectedIds,
+    switches: state.switches,
     rows: {
       replaceRows: state.replaceRows,
       showRows: state.showRows,
@@ -274,6 +281,7 @@ function MasterWindow({
     user: auth.status === 'authenticated' ? auth.user : null,
     tags: state.tags,
     refresh: state.refresh,
+    switches: state.switches,
     setField: state.setField,
     showAll: state.showAll,
     printSelectedColumn: () => void openPrint(null),
@@ -406,7 +414,12 @@ function MasterWindow({
       {!spec.reportOnly && (
         <>
           <div style={{ height: panelHeight }} className="shrink-0 overflow-hidden">
-            <FormFields state={state} ctx={formContext} openTransRef={openTransRef} />
+            <FormFields
+              state={state}
+              ctx={formContext}
+              openTransRef={openTransRef}
+              panelExtra={inPanel ? (x) => inPanel(actions, state, x) : undefined}
+            />
           </div>
           <div
             role="separator"

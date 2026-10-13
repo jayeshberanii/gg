@@ -54,8 +54,9 @@ the record.
 
 ## Work report
 
-`insertworkreports` on **Edit only** (the Add call is commented out; Delete logs nothing) —
-`workReportOn: { add: false, delete: false }`. `lblEntry` shows the entry user.
+`insertworkreports` on **Add and Edit** (Delete logs nothing) — `workReportOn: { delete: false }`.
+Up to desktop v3.3.3.6 the Add call was commented out; v3.4.3.1 logs the Add too
+(`frmPartyMaster.vb:826`). `lblEntry` shows the entry user.
 
 ## Right-click menu
 
@@ -67,7 +68,7 @@ Print Report › Selected Column / Send To Excel, then **Send To** ›
 | BookT                       | frmBookTranNew (strTid) — the web's Library No dialog, with those BookT ids                                      |
 | Kruti Master                | `kruti-master` via `krutireflibno.bhandarkt`                                                                     |
 | IssueTran                   | "Only Party(Press Yes) / Only Ref Party(Press No) / Both Party And Ref Party(Press Cancel)" → `issue-master`     |
-| Inword                      | `inward-master` (forkt / fromkt)                                                                                 |
+| Inward                      | `inward-master` (forkt / fromkt)                                                                                 |
 | WorkGiven                   | `work-given-master` (Assignedbykt / AssignedTokt) — that menu item is commented out, so it opens the placeholder |
 | Catalogue                   | disabled — the desktop handler is commented out                                                                  |
 | Prakashan List Anya Bhandar | `book-master-anya-bhandar`                                                                                       |
@@ -100,3 +101,10 @@ Menu gating, plus AMaster-only Block Party (above).
   four popups (txtAddress text, deposit dates and SrNo, anya-name upsert/delete, rows kept
   when a popup is not sent), a bad deposit date, CheckInUse refusal, delete with child
   rows, Relation lists by table, Send To actions.
+
+## Desktop v3.4.3.1
+
+- Adding a party writes a work report (see Work report).
+- Send To › "Inword" is now captioned **"Inward"**. The delete refusal `Record is in used in
+Inword Master` is unchanged on the desktop (`PartyMRepository.CheckInUse`) and here.
+- Not fixed on the desktop: `UpSeq` (the web's fix stands).

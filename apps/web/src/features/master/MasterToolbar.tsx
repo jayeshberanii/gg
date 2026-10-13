@@ -139,8 +139,14 @@ export function MasterToolbar({
               <input
                 type="checkbox"
                 disabled={c.disabled}
-                checked={state.fields[c.name] === 'True'}
-                onChange={(e) => state.setField(c.name, e.target.checked ? 'True' : 'False')}
+                checked={
+                  c.listSwitch ? Boolean(state.switches[c.name]) : state.fields[c.name] === 'True'
+                }
+                onChange={(e) =>
+                  c.listSwitch
+                    ? state.setSwitch(c.name, e.target.checked)
+                    : state.setField(c.name, e.target.checked ? 'True' : 'False')
+                }
               />
               {c.label}
             </label>
@@ -215,8 +221,14 @@ export function MasterToolbar({
             <input
               type="checkbox"
               disabled={c.disabled}
-              checked={state.fields[c.name] === 'True'}
-              onChange={(e) => state.setField(c.name, e.target.checked ? 'True' : 'False')}
+              checked={
+                c.listSwitch ? Boolean(state.switches[c.name]) : state.fields[c.name] === 'True'
+              }
+              onChange={(e) =>
+                c.listSwitch
+                  ? state.setSwitch(c.name, e.target.checked)
+                  : state.setField(c.name, e.target.checked ? 'True' : 'False')
+              }
             />
             {c.label}
           </label>

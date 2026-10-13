@@ -79,7 +79,7 @@ export async function updateTxtBookTran(db: Executor, books: readonly number[]) 
 /** UpdateTxtAuthor: praksnAuthorT.txtAuth, then BookM.txtAuthor, rebuilt from the author tables. */
 export async function updateTxtAuthor(db: Executor, books: readonly number[]) {
   await sql`
-    UPDATE praksnAuthorT SET txtAuth = (SELECT STUFF((SELECT ',' + AT.authtyattr + CASE WHEN ISNULL(colAT.Name, '') = '' THEN '' ELSE '(' + colAT.Name + ')' END
+    UPDATE praksnAuthorT SET txtAuth = (SELECT STUFF((SELECT ',' + AT.authortype + CASE WHEN ISNULL(colAT.Name, '') = '' THEN '' ELSE '(' + colAT.Name + ')' END
       FROM PraksnAuthorAuthTypeT PT LEFT JOIN authtype AT ON PT.authortypekt = AT.authtycokm
       LEFT JOIN columnmaster colAT ON PT.signkt = colAT.ColumnMastkm AND colAT.vibhag = 'Sign'
       WHERE PT.praksnauthorkt = praksnAuthorT.praksnauthorkm FOR XML PATH('')), 1, 1, ''))
@@ -538,6 +538,19 @@ export const bookActions: Actions = {
     if (grp <= 0) return { kind: 'message', message: '' };
     return { kind: 'list', rows: await ctx.list(sql`CommonGrpNo = ${grp}`) };
   },
+  // Ctrl+P (v3.4.3.1), Parts Group › Show Book of Current Group Parts: likewise for GrpNo.
+  async 'current-part-group'(db, _user, _selected, ctx) {
+    const grp = numberParam(ctx, 'grpNo');
+    if (grp <= 0) return { kind: 'message', message: '' };
+    return { kind: 'list', rows: await ctx.list(sql`Grpno = ${grp}`) };
+  },
+  // Show All Book of Common Group (v3.4.3.1): every book that has a common group, not only
+  // those among the grid's rows, in CommonGrpNo order (a stable sort of the newest-first list).
+  async 'all-common-groups'(db, _user, _selected, ctx) {
+    const rows = await ctx.list(sql`ISNULL(CommonGrpNo, 0) > 0`);
+    const grp = (r: GridRow) => Number(r.CommonGrpNo) || 0;
+    return { kind: 'list', rows: [...rows].sort((a, b) => grp(a) - grp(b)) };
+  },
   async 'common-add-new'(db, _user, selected) {
     await inTransaction(db, async (trx) => {
       const grpNo = Number(
@@ -591,14 +604,18 @@ export const bookActions: Actions = {
       message: `Common Group from ( ${count}) Records Deleted Successfully`,
     };
   },
-  // Show Common Group Having Single Record: which of the grid's books are alone in their group.
-  async 'common-single'(db) {
-    const found = await ids(
-      db,
-      sql`SELECT BookMastkm AS id FROM BookM WHERE CommonGrpNo IN (SELECT CommonGrpNo FROM BookM WHERE CommonGrpNo > 0
-        GROUP BY CommonGrpNo HAVING COUNT(CommonGrpNo) = 1)`,
-    );
-    return { kind: 'table', title: 'ids', columns: ['BookMastkm'], rows: found.map((id) => [id]) };
+  // Show Common Group Having Single Record (v3.4.3.1: GetDataTable with this WhereCondition,
+  // so the newest `listLimit` of the books that are alone in their group, not a filter of the
+  // grid's rows).
+  async 'common-single'(db, _user, _selected, ctx) {
+    return {
+      kind: 'list',
+      rows: await ctx.list(
+        sql`BookMastKm IN (SELECT BookMastkm FROM BookM WHERE CommonGrpNo IN (SELECT CommonGrpNo FROM BookM
+          WHERE (CommonGrpNo > 0) GROUP BY CommonGrpNo HAVING COUNT(CommonGrpNo) = 1))`,
+        { limit: true },
+      ),
+    };
   },
   async 'common-single-reset'(db) {
     const result = await sql`
@@ -609,12 +626,15 @@ export const bookActions: Actions = {
   },
 
   // ----------------------------------------------------------------------------- Utility ----
+  // v3.4.3.1: matched by the library row's key (was by the LibNo text), sent to Excel. A NULL
+  // BookTKt in krutireflibno would make the desktop's NOT IN find nothing; it is left out here.
   async 'no-ref-libno'(db) {
     return excel(
       db,
-      'frmPopup',
+      'BookM',
       sql`SELECT DISTINCT BookMastkm, BookName FROM BookM INNER JOIN BookT ON BookM.BookMastkm = BookT.BookMastkt
-        WHERE LibNo NOT IN (SELECT RefLibNo FROM krutireflibno WHERE RefLibNo IS NOT NULL)`,
+        WHERE tid NOT IN (SELECT BookTKt FROM krutireflibno WHERE BookTKt IS NOT NULL)`,
+      'No Records Found',
     );
   },
   async 'libno-in-range'(db, _user, _selected, ctx) {
@@ -1031,8 +1051,13 @@ export const bookActions: Actions = {
     );
     return { kind: 'refreshed', rows: [] };
   },
-  async 'update-akaradi-seq'(db) {
-    await runProc(() => sql`EXEC UpdateBookKrutiAkaradiSeq`.execute(db));
+  // Update Kruti Seq (v3.4.3.1; was Update Book Akaradi Seq / UpdateBookKrutiAkaradiSeq): the
+  // procedure renumbers BookM.KrutiAkaradiSeq for the picked sampraday; its result set is not
+  // shown (ExecuteNonQuery). Nothing runs without a pick.
+  async 'update-kruti-seq'(db, _user, _selected, ctx) {
+    const sampradayKt = numberParam(ctx, 'sampradayKt');
+    if (sampradayKt <= 0) return { kind: 'message', message: '' };
+    await runProc(() => sql`EXEC PrintKrutiPrakashakReport ${sampradayKt}`.execute(db));
     return { kind: 'message', message: '' };
   },
 

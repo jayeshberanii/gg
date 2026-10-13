@@ -37,6 +37,12 @@ describe.skipIf(!hasDb)('Party Master via the master engine (integration)', () =
     expect(added.body.id).toBe(next);
     expect(added.body.row).toMatchObject({ partyMkm: next, PName: 'વેબ પાર્ટી' });
     expect(added.body.row.SampradayName).toBeTruthy();
+    // v3.4.3.1: adding a party writes a work report too.
+    const logged = await count(
+      sql<{ n: number }>`
+        SELECT COUNT(*) AS n FROM WorkReportM WHERE TableName = 'PartyM' AND RecordNo = ${String(next)}`,
+    );
+    expect(Boolean(added.body.workReport) || logged > 0).toBe(true);
     // An Operator cannot block a party (cmbBlockParty is enabled for AMaster only).
     const record = (await h.user.get(`${API}/record/${next}`)).body as GridRow;
     expect(record).toMatchObject({ UpSeq: 4, IsBlocked: false, BlockParty: 'No' });

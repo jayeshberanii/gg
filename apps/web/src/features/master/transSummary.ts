@@ -42,13 +42,17 @@ export function genericSummary(rows: ChildRow[], columns: string[]): string {
   return out.replace(/,,/g, ',');
 }
 
-/** The Sampraday popup's own text: each name, repeated in brackets when it has a Remark. */
+/**
+ * The Sampraday popup's own text: each name, with its Remark in brackets when it has one
+ * (v3.4.3.1; the desktop used to repeat the name inside the brackets).
+ */
 export function sampradaySummary(rows: ChildRow[]): string {
   let out = '';
   for (const row of rows) {
     const name = netString(row.SampradayName).trim();
     out += `,${name}`;
-    if (netString(row.Remark).trim() !== '') out += `(${name})`;
+    const remark = netString(row.Remark).trim();
+    if (remark !== '') out += `(${remark})`;
   }
   if (out !== '') out = out.slice(1);
   return out.replace(/,,/g, ',');

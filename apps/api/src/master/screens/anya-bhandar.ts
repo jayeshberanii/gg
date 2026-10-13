@@ -439,6 +439,8 @@ async function save(
 // ------------------------------------------------------------------------------------------
 
 const DONE_BY_BOOK_TYPES = sql`(SELECT authtycokm FROM authtype WHERE authortype IN (N'मूळकर्ता', N'टीकाकार', N'अनुवादक', N'विवेचक', N'लेखक'))`;
+/** The book's author rows (praksnauthorkm) that carry one of those types. */
+const TYPED_AUTHOR_ROWS = sql`(SELECT praksnauthorkt FROM PraksnAuthorAuthTypeT WHERE authortypekt IN ${DONE_BY_BOOK_TYPES} AND praksnauthorkt IS NOT NULL)`;
 
 async function rowsOf(db: Executor, query: ReturnType<typeof sql>): Promise<ChildRow[]> {
   const { rows } = await sql<Record<string, unknown>>`${query}`.execute(db);
@@ -448,10 +450,11 @@ async function rowsOf(db: Executor, query: ReturnType<typeof sql>): Promise<Chil
 /**
  * The fill from a picked book: its boxes (GetBookDataTable — nothing for an Operator when the
  * book carries a CM/MS/CP/SN number), its latest library number, and its popup rows with their
- * keys negated so that Save inserts them for this record. Authors are dropped when the book has
- * any author typed मूळकर्ता/टीकाकार/अनुवादक/विवेचक/लेखक (a test of the whole book, kept as
- * the desktop does it). The Mul/Anu author candidates are the book's authors of those types and
- * the Kruti authors of its library numbers; the form appends them to its own rows.
+ * keys negated so that Save inserts them for this record. An author typed
+ * मूळकर्ता/टीकाकार/अनुवादक/विवेचक/लेखक is dropped (per author since v3.4.3.1; before, one such
+ * author dropped every author of the book). The Mul/Anu author candidates are the book's
+ * authors of those types and the Kruti authors of its library numbers and, since v3.4.3.1, of
+ * the library numbers of its common group; the form appends them to its own rows.
  */
 export async function fillFromBook(
   db: Executor,
@@ -487,7 +490,7 @@ export async function fillFromBook(
   const authors = await rowsOf(
     db,
     sql`SELECT -praksnauthorkm AS AnyaBhandarAuthorKm,
-          STUFF((SELECT ',' + ISNULL(authtype.authtyattr, '') + CASE WHEN ISNULL(colAT.Name, '') = '' THEN '' ELSE '(' + colAT.Name + ')' END
+          STUFF((SELECT ',' + ISNULL(authtype.authortype, '') + CASE WHEN ISNULL(colAT.Name, '') = '' THEN '' ELSE '(' + colAT.Name + ')' END
             FROM PraksnAuthorAuthTypeT INNER JOIN authtype ON PraksnAuthorAuthTypeT.authortypekt = authtype.authtycokm
             LEFT JOIN columnmaster colAT ON PraksnAuthorAuthTypeT.signkt = colAT.ColumnMastkm AND colAT.vibhag = 'Sign'
             WHERE Main.praksnauthorkm = PraksnAuthorAuthTypeT.praksnauthorkt FOR XML PATH('')), 1, 1, '') AS authortype,
@@ -501,8 +504,7 @@ export async function fillFromBook(
             LEFT JOIN columnmaster colA ON praksnAuthorAuthT.signkt = colA.ColumnMastkm AND colA.vibhag = 'Sign'
             WHERE Main.praksnauthorkm = praksnAuthorAuthT.praksnauthorkt FOR XML PATH('')), 1, 1, '') AS authorname,
           seq
-        FROM praksnAuthorT Main WHERE prakashannokt = ${bookId}
-          AND prakashannokt NOT IN (SELECT prakashannokt FROM PraksnAuthorAuthTypeT WHERE authortypekt IN ${DONE_BY_BOOK_TYPES})
+        FROM praksnAuthorT Main WHERE prakashannokt = ${bookId} AND praksnauthorkm NOT IN ${TYPED_AUTHOR_ROWS}
         ORDER BY seq`,
   );
   const authorNames = await rowsOf(
@@ -517,8 +519,7 @@ export async function fillFromBook(
         LEFT OUTER JOIN authmast ON praksnAuthorAuthT.authorkt = authmast.authorcokm
         LEFT JOIN AuthMAnyNmT ON praksnAuthorAuthT.AuthAnyaNmKt = AuthMAnyNmT.AuthAnyaNmKm
         LEFT OUTER JOIN columnmaster ON columnmaster.ColumnMastkm = praksnAuthorAuthT.signkt
-        WHERE praksnAuthorAuthT.prakashannokt = ${bookId}
-          AND prakashannokt NOT IN (SELECT prakashannokt FROM PraksnAuthorAuthTypeT WHERE authortypekt IN ${DONE_BY_BOOK_TYPES})
+        WHERE praksnAuthorAuthT.prakashannokt = ${bookId} AND praksnauthorkt NOT IN ${TYPED_AUTHOR_ROWS}
         ORDER BY praksnAuthorAuthT.seq`,
   );
   // With no author rows the type rows are cleared too.
@@ -529,7 +530,7 @@ export async function fillFromBook(
           db,
           sql`SELECT -PraksnAuthorAuthTypeT.praksnauthorauthtypekm AS AnyaBhandarAuthorAuthTypekm,
                 -PraksnAuthorAuthTypeT.praksnauthorkt AS AnyaBhandarAuthorKt, PraksnAuthorAuthTypeT.authortypekt,
-                ISNULL(authtype.authtyattr, '') AS authortype, ISNULL(PraksnAuthorAuthTypeT.signkt, 0) AS signkt,
+                ISNULL(authtype.authortype, '') AS authortype, ISNULL(PraksnAuthorAuthTypeT.signkt, 0) AS signkt,
                 ISNULL(columnmaster.name, '') AS Sign, PraksnAuthorAuthTypeT.seq
               FROM PraksnAuthorAuthTypeT LEFT OUTER JOIN authtype ON PraksnAuthorAuthTypeT.authortypekt = authtype.authtycokm
               LEFT OUTER JOIN columnmaster ON PraksnAuthorAuthTypeT.signkt = columnmaster.ColumnMastkm
@@ -578,13 +579,22 @@ export async function fillFromBook(
     );
   const mul = await bookAuthors(sql`(N'मूळकर्ता', N'टीकाकार')`);
   const anu = await bookAuthors(sql`(N'अनुवादक', N'विवेचक', N'लेखक')`);
+  // The Kruti authors of the book's library numbers and of its common group's (v3.4.3.1).
+  const commonGrpNo = int(
+    await scalar(db, sql`SELECT ISNULL(CommonGrpNo, 0) FROM BookM WHERE BookMastkm = ${bookId}`),
+  );
   const kruti = await rowsOf(
     db,
     sql`SELECT DISTINCT krutiautht.authorcokt AS AuthorKt, authmast.authorname AS AuthorName, IsDownLevel
         FROM krutireflibno INNER JOIN krutiMst ON krutireflibno.krutimstkt = krutimstkm
         INNER JOIN krutiautht ON krutiMst.krutimstkm = krutiautht.krutimstkt
         INNER JOIN authmast ON krutiautht.authorcokt = authmast.authorcokm
-        WHERE BookTKt IN (SELECT Tid FROM BookT WHERE BookMastkt = ${bookId}) AND krutireflibno.IsCommonGroup IN (0, 1)`,
+        WHERE BookTKt IN (SELECT Tid FROM BookT WHERE BookMastkt = ${bookId})
+          ${
+            commonGrpNo > 0
+              ? sql`OR BookTKt IN (SELECT Tid FROM BookT INNER JOIN BookM ON BookT.BookMastkt = BookM.BookMastkm WHERE CommonGrpNo = ${commonGrpNo})`
+              : sql``
+          }`,
   );
   return {
     fields,
@@ -690,9 +700,11 @@ export const anyaBhandar: ScreenDefinition = {
     bookmastkt: (db) =>
       pickListOf(
         db,
-        sql`SELECT BookMastkm, BookName, Part, txtPrakashak AS Prakashak, txtAuthor AS Author, PSamvat AS Samvat,
-              txtBhasha AS Bhasha, Pages, TotalPages, txtBookTran AS LibNo
-            FROM BookM WHERE ISNULL(BookName, '') <> '' ORDER BY BookName`,
+        sql`SELECT BookMastkm, BookName, Part, txtPrakashak AS Prakashak, txtAuthor AS Author,
+              samvmast.samvatname AS SamvatType, PSamvat AS Samvat, txtBhasha AS Bhasha, Pages, TotalPages,
+              txtBookTran AS LibNo
+            FROM BookM LEFT JOIN samvmast ON BookM.PSamvatcokt = samvmast.samvatcokm
+            WHERE ISNULL(BookName, '') <> '' ORDER BY BookName`,
       ),
     /** txtBookTKt: every library number. */
     booktkt: (db) =>

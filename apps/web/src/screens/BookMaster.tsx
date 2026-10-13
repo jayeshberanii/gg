@@ -573,6 +573,13 @@ function showCurrentCommonGroup(a: ScreenActions, state: MasterState) {
   if (grp > 0) void a.run('current-common-group', { commonGrpNo: grp }, []);
 }
 
+/** ShowBookOfCurrentGroupParts (v3.4.3.1): the books of the current record's parts group. */
+function showCurrentPartGroup(a: ScreenActions, state: MasterState) {
+  const row = state.rows.find((r) => Number(r.BookMastkm) === state.currentId);
+  const grp = Number(row?.Grpno) || 0;
+  if (grp > 0) void a.run('current-part-group', { grpNo: grp }, []);
+}
+
 type Deps = {
   openBookT: (ctx: FormContext) => void;
   openScreen: (screen: string, ids: number[]) => void;
@@ -595,7 +602,11 @@ function buildSpec(deps: Deps): ScreenSpec {
     lockPanel: true,
     lockedColumns: ['Locked'],
     lockAction: 'lock-records',
-    toolbarCheckbox: { name: 'IsPrint', label: 'IsPrint', right: 181 },
+    // chkSearchNotInOB (v3.4.3.1) is a switch of the list, not a column; chkIsPrint is the record's.
+    toolbarCheckbox: [
+      { name: 'SearchNotInOB', label: 'Search Not In OB', right: 398, listSwitch: true },
+      { name: 'IsPrint', label: 'IsPrint', right: 241 },
+    ],
     labels: [
       ['Book Name', 6, 9],
       ['Pari. Name/Part Type', 327, 9],
@@ -603,24 +614,24 @@ function buildSpec(deps: Deps): ScreenSpec {
       ['Smvt Type', 6, 79],
       ['Samvat/PSamvatVK', 327, 79],
       ['Avruti', 693, 79],
-      ['GMalaName/No', 6, 116],
-      ['Pgs/TotPgs', 327, 116],
+      ['GMala Name/No', 6, 116],
+      ['Pages/Total Pages', 327, 116],
       ['Pariman/Price', 693, 116],
       ['Size/Shape', 6, 153],
       ['Fund Type', 327, 153],
       ['Nakal/ISBN No', 693, 153],
       ['Vishesh', 6, 190],
       ['Remark', 327, 190],
-      ['Mix Sign/Rem', 693, 190],
+      ['Mix Sign/Remark', 691, 190],
       ['Print Style', 6, 227],
       ['Bind Paper/Kruti Work', 327, 227],
       ['ComGp/PrintNo', 693, 227],
-      ['Grp No/Name', 6, 264],
-      ['Grp Pari Nm/Part', 327, 264],
+      ['Group No/Name', 6, 264],
+      ['Group Pari Name/Part', 327, 264],
       ['Vibhag/Samprdy', 693, 264],
       ['Prakashak', 6, 301],
       ['Author', 327, 301],
-      ['Bhasha/Lippi', 693, 301],
+      ['Bhasha/Lipi', 691, 301],
       ['Prak Vishesh', 6, 338],
       ['Subject', 327, 338],
       ['Kruti', 693, 338],
@@ -628,13 +639,16 @@ function buildSpec(deps: Deps): ScreenSpec {
       ['Anya Bhandar', 327, 375],
       ['Info', 693, 375],
       ['Magazine Remark', 6, 412],
+      // "Prak Vishesh Name" since v3.4.3.1, once the database has BookM.PrakVisheshName.
       ['Short Name', 327, 412],
     ].map(([text, x, y]) => ({
       text: text as string,
       at: { x: x as number, y: y as number },
       sizePt: 11.25,
     })),
+    // In tab order (v3.4.3.1 renumbered the TabIndexes to follow the screen; Subject (old) got 0).
     fields: [
+      tran('SubjTran', 797, 403, 205),
       {
         name: 'BookName',
         label: 'Book Name',
@@ -718,7 +732,6 @@ function buildSpec(deps: Deps): ScreenSpec {
       },
       tran('MagazineRemarkTran', 115, 405, 209),
       { name: 'ShortName', at: { x: 465, y: 405, w: 222 } },
-      tran('SubjTran', 797, 403, 205),
       // Visible = False on the desktop, so its popup (Magazine Vishesh) cannot be opened there.
       { name: 'BookMagazineVisheshTran', at: { x: 0, y: 0, w: 0 }, hidden: true },
       // The MS data (frmBookMSData) the form keeps in variables and saves with the book.
@@ -779,7 +792,10 @@ function buildSpec(deps: Deps): ScreenSpec {
     beforeSave: async ({ disabled }) => ({ GrpLocked: disabled.GrpName ? 1 : 0 }),
     // btnCopy_Click: these boxes clear, and the popups FillTransactionDatatable loads are copied.
     // ShowBookofCurrentComGrpToolStripMenuItem's ShortcutKeys.
-    ctrlKeys: { g: (a, state) => showCurrentCommonGroup(a, state) },
+    ctrlKeys: {
+      g: (a, state) => showCurrentCommonGroup(a, state),
+      p: (a, state) => showCurrentPartGroup(a, state),
+    },
     copy: {
       clear: [
         'BookTran',
@@ -905,7 +921,6 @@ export function BookMaster(props: ScreenProps) {
         if (password !== null) await a.run(action, { ...extra, password }, ids);
       };
     const notOnWeb = (what: string) => () => void a.alert(NOT_ON_WEB(what));
-    const showRows = (rows: GridRow[]) => state.showRows(rows);
     const printVisible =
       user !== null &&
       (user.userType === UserType.Admin ||
@@ -963,7 +978,7 @@ export function BookMaster(props: ScreenProps) {
           // item('Prakashan List Anya Bhandar', run('prakashan-list-anya-bhandar', { current })),
           item('Graphic Master', run('graphic-master')),
           // item('Granth Mala', run('granth-mala', { gridIds: a.gridIds })),
-          item('Inword Master', run('inword-master')),
+          item('Inward Master', run('inword-master')),
           // item('Party Master', run('party-master')),
           item('Issue Master', run('issue-master')),
           item('Magazine Master', run('magazine-master')),
@@ -1086,15 +1101,14 @@ export function BookMaster(props: ScreenProps) {
             if (headId > 0) await a.run('group-add-existing', { head: headId });
           }),
           item('Delete From Group Parts', withPassword('group-delete')),
+          item('Show Book of Current Group Parts', () => showCurrentPartGroup(a, state), 'Ctrl+P'),
         ],
       },
       {
         kind: 'submenu',
         label: 'Common Group',
         items: [
-          item('Show All Book of Common Group', () =>
-            showRows(state.rows.filter((r) => Number(r.CommonGrpNo) > 0)),
-          ),
+          item('Show All Book of Common Group', run('all-common-groups', undefined, [])),
           item(
             'Show Book of Current Common Group',
             () => showCurrentCommonGroup(a, state),
@@ -1120,12 +1134,7 @@ export function BookMaster(props: ScreenProps) {
           //   kind: 'submenu',
           //   label: 'Utility',
           //   items: [
-          //     item('Show  Common Group Having Single Record', async () => {
-          //       const r = await a.call('common-single', undefined, []);
-          //       if (r?.kind !== 'table') return;
-          //       const single = new Set(r.rows.map((x) => Number(x[0])));
-          //       showRows(state.rows.filter((row) => single.has(Number(row.BookMastkm))));
-          //     }),
+          //     item('Show  Common Group Having Single Record', run('common-single', undefined, [])),
           //     item('Update Common Group No = 0 Having Singe Recrod', async () => {
           //       if (await a.confirm('Are you sure to update common group?'))
           //         await a.run('common-single-reset', undefined, []);
@@ -1140,8 +1149,9 @@ export function BookMaster(props: ScreenProps) {
         items: [
           // item('Show BookM Record having no Record in RefLibNo', async () => {
           //   const r = await a.call('no-ref-libno', undefined, []);
-          //   if (r?.kind === 'table')
-          //     setDialog({ kind: 'popup', title: '', columns: r.columns, rows: r.rows });
+          //   if (r?.kind !== 'table') return;
+          //   if (r.rows.length > 0) sendTableToExcel(r.title, r.columns, r.rows);
+          //   else if (r.emptyMessage) await a.alert(r.emptyMessage);
           // }),
           // item('Show BookM Record having LibNo in Range', async () => {
           //   const series = await ask('Please Enter Series');
@@ -1330,7 +1340,11 @@ export function BookMaster(props: ScreenProps) {
           //     }),
           //   ],
           // },
-          item('Update Book Akaradi Seq', run('update-akaradi-seq', undefined, [])),
+          item('Update Kruti Seq', async () => {
+            const r = await pick('List', namedList('kruti-sampraday'), true);
+            const sampradayKt = Number(r?.code[0]) || 0;
+            if (sampradayKt > 0) await a.run('update-kruti-seq', { sampradayKt }, []);
+          }),
           // item(
           //   'ScanData Folder Info',
           //   notOnWeb('ScanData Folder Info (\\\\192.168.0.210\\ScanData)'),

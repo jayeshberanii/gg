@@ -4,7 +4,10 @@ import { expect, type Page, test } from '@playwright/test';
 export const API = 'http://localhost:8181';
 
 export type Scenario = {
-  users: Record<'fresh' | 'pending' | 'absent' | 'manyPending' | 'reporter' | 'admin', string>;
+  users: Record<
+    'fresh' | 'pending' | 'absent' | 'manyPending' | 'reporter' | 'admin' | 'amaster',
+    string
+  >;
   password: string;
   today: string;
   lastWorkingDay: string;

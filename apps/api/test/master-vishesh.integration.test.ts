@@ -72,6 +72,23 @@ describe.skipIf(!hasDb)('Vishesh Master via the master engine (integration)', ()
       ),
     ).toBeGreaterThan(0);
 
+    // Re-saving the Adya Sthapak popup on an existing record replaces its rows.
+    const author2 = await h.scalar(
+      sql`SELECT TOP 1 authorcokm AS n FROM authmast WHERE authorcokm > ${author} ORDER BY authorcokm`,
+    );
+    const resaved = await save(id, {
+      Vishesh: 'Edited',
+      remark: 'WebTest',
+      VisheshAdyaSthapakTran: 'y',
+      'VisheshAdyaSthapakTran.Rows': [{ AuthorKt: author2, AdyaSthapak: 'y', Seq: 1 }],
+    });
+    expect(resaved.status, JSON.stringify(resaved.body)).toBe(200);
+    expect(
+      ((await h.user.get(`${API}/trans/VisheshAdyaSthapakTran/${id}`)).body as TransGrid).rows.map(
+        (r) => r.AuthorKt,
+      ),
+    ).toEqual([author2]);
+
     // Delete takes the child rows with it.
     const refsBefore = await h.scalar(
       sql`SELECT COUNT(*) AS n FROM RefrenceT WHERE Tablekt = ${tk} AND RecordKt = ${id}`,

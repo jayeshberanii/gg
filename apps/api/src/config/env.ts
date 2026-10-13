@@ -41,6 +41,12 @@ export const envSchema = z.object({
    * the second Security password still works there.
    */
   GRAPHICS_LOCK_PASSWORD: z.string().optional(),
+  /**
+   * LabIssueMRepository.GetUserNotReturnedBook: nobody gets a new lab issue while they hold books
+   * delivered more than 30 days ago ("You Cannot Issue any Books …"). Desktop v3.4.3.1 switched
+   * the check off ("Temporary Comment"), so it is off unless this is `true`.
+   */
+  LAB_ISSUE_OLD_DUE_BLOCK: bool.default(false),
   DB_HOST: z.string().min(1),
   DB_PORT: z.coerce.number().int().positive().default(1433),
   DB_NAME: z.string().min(1),

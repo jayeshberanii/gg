@@ -163,14 +163,20 @@ async function saveBookT(
   return tid;
 }
 
-/** The tables that point at a library row, as Delete() checks them (messages verbatim). */
-const IN_USE: [string, string, string][] = [
+/**
+ * The tables that point at a library row, as Delete() checks them (messages verbatim). Since
+ * v3.4.3.1 a Book Confirmation counts only while it is 'Sent' and a Lab Issue only while its
+ * status is neither Closed nor CancelReq (the fourth entry: the rows that count).
+ */
+const OPEN_CONFIRMATION = sql`BookConfirmationStatus = 'Sent'`;
+const OPEN_LAB_ISSUE = sql`Statuskt NOT IN (SELECT ColumnMastkm FROM columnmaster WHERE Vibhag = 'LabIssueStatus' AND Name IN ('Closed', 'CancelReq'))`;
+const IN_USE: [string, string, string, RawBuilder<unknown>?][] = [
   ['SampradayBriefT', 'BookTKt', '- Sampraday Master(Brief)'],
   ['SampradayRemarkT', 'BookTKt', '- Sampraday Master(Remark)'],
   ['AuthMAnyLibNoT2', 'BookTKt', '- Author Anya LibNo'],
   ['SampradaySthalT', 'BookTKt', '- Author Anya LibNo'],
-  ['BookConfirmation', 'BookTKt', '- Book Confirmation'],
-  ['LabIssueM', 'BookTKt', '- Lab Issue'],
+  ['BookConfirmation', 'BookTKt', '- Book Confirmation', OPEN_CONFIRMATION],
+  ['LabIssueM', 'BookTKt', '- Lab Issue', OPEN_LAB_ISSUE],
   ['AuthorParyayT', 'BookTKt', '- Author Master(Paryay)'],
   ['AuthorNoteT', 'BookTKt', '- Author Master(Note)'],
   ['AuthorNoteT2', 'BookTKt', '- Author Master(Note 2)'],
@@ -205,7 +211,12 @@ const IN_USE: [string, string, string][] = [
   ['MagazineVishesh', 'BookTKt', '- Magazine Vishesh Master New'],
 ];
 
-/** The references Delete() moves to the chosen other library row before deleting this one. */
+/**
+ * The references Delete() moves to the chosen other library row before deleting this one. Every
+ * Book Confirmation and Lab Issue row moves; the desktop (v3.4.3.1) moves only the ones that do
+ * not count as in use and leaves a 'Sent' confirmation or an open lab issue pointing at the
+ * deleted row (see the doc).
+ */
 const TRANSFER: [string, string][] = [
   ['PrakMRefLibNoT', 'BookTKt'],
   ['SampradayBriefT', 'BookTKt'],
@@ -248,10 +259,12 @@ const TRANSFER: [string, string][] = [
 
 async function inUse(db: Executor, tid: number): Promise<string> {
   let out = '';
-  for (const [t, column, label] of IN_USE) {
+  for (const [t, column, label, counted] of IN_USE) {
     const n = Number(
-      (await scalar(db, sql`SELECT COUNT(*) FROM ${ident(t)} WHERE ${ident(column)} = ${tid}`)) ??
-        0,
+      (await scalar(
+        db,
+        sql`SELECT COUNT(*) FROM ${ident(t)} WHERE ${ident(column)} = ${tid} ${counted ? sql`AND ${counted}` : sql``}`,
+      )) ?? 0,
     );
     if (n > 0) out = signBetween(out, label, '\r\n');
   }
@@ -312,9 +325,13 @@ export const bookTran: ScreenDefinition = {
   },
 
   actions: {
-    // txtSerieskt's F2: the series' next number goes into the Library No box.
+    // txtSerieskt's F2: the series' next number goes into the Library No box (MdlLib.GetMemID,
+    // which fills the series' gaps since v3.4.3.1).
     async 'next-libno'(db, _user, _selected, ctx) {
-      return { kind: 'message', message: await nextLibNo(db, numberParam(ctx, 'seriesKt')) };
+      return {
+        kind: 'message',
+        message: await nextLibNo(db, numberParam(ctx, 'seriesKt'), { fillGaps: true }),
+      };
     },
     // The row's LibNos of the same book, for Delete's transfer choice.
     async 'transfer-choices'(db, _user, _selected, ctx) {
@@ -454,7 +471,14 @@ export const bookTran: ScreenDefinition = {
           name: text(await scalar(db, sql`SELECT Libno FROM BookT WHERE tid = ${tid}`)),
         });
       }
-      const message = await requestLabIssue(db, user.id, items, numberParam(ctx, 'forKt'), 'Book');
+      const message = await requestLabIssue(
+        db,
+        user.id,
+        items,
+        numberParam(ctx, 'forKt'),
+        'Book',
+        ctx.env.LAB_ISSUE_OLD_DUE_BLOCK,
+      );
       return { kind: 'message', message };
     },
     async 'send-book-confirmation'(db, user, selected, ctx) {
