@@ -32,7 +32,12 @@ const spec: ScreenSpec = {
       labelAt: { x: 12, y: 174 },
       at: { x: 111, y: 170, w: 338 },
     },
-    { name: 'ColumnNo', label: 'No', labelAt: { x: 476, y: 18 }, at: { x: 582, y: 17, w: 338 } },
+    {
+      name: 'ColumnNo',
+      label: 'Column No',
+      labelAt: { x: 476, y: 18 },
+      at: { x: 582, y: 17, w: 338 },
+    },
     { name: 'Vibhag', label: 'Vibhag', labelAt: { x: 476, y: 72 }, at: { x: 582, y: 68, w: 338 } },
     {
       name: 'ShortNm',
