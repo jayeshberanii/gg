@@ -27,6 +27,10 @@ Generic master engine; this screen supplies `apps/api/src/master/screens/party.t
 | Anya Name / Address / Relation / Deposit     | popups                                        | see below                                |
 | Photo / FormFilled                           | GroupBoxes with PictureBoxes                  | nothing ever fills them; drawn empty     |
 
+**Block Party grid column (web addition).** The desktop grid (`GvMain`) has no Block column and
+tblSearch's `IsBlocked` row is not `DisplayInGrid`; the web adds one through
+`gridColumnsAlso`, showing the form's text (`Yes` / `No`) as `BlockParty`.
+
 ## Validation
 
 `"Please Enter Party Name"` (`PName` blank).

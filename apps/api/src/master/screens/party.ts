@@ -122,6 +122,15 @@ export const partyMaster: ScreenDefinition = {
 
   validate: (f) => (trimmed(f.PName) === '' ? 'Please Enter Party Name' : ''),
 
+  // Web-only Block Party grid column (the desktop's GvMain has none; tblSearch's IsBlocked row is
+  // not DisplayInGrid), as the form's cmbBlockParty text.
+  gridColumnsAlso: [
+    {
+      column: 'IsBlocked',
+      select: `CASE WHEN ISNULL(PartyM.IsBlocked, 0) = 1 THEN 'Yes' ELSE 'No' END AS BlockParty`,
+    },
+  ],
+
   newDefaults: async () => ({ BlockParty: 'No' }),
   async recordExtras(db, id) {
     const { rows } = await sql<{ b: boolean | null }>`

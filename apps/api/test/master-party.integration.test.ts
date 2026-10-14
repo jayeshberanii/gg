@@ -37,6 +37,7 @@ describe.skipIf(!hasDb)('Party Master via the master engine (integration)', () =
     expect(added.body.id).toBe(next);
     expect(added.body.row).toMatchObject({ partyMkm: next, PName: 'વેબ પાર્ટી' });
     expect(added.body.row.SampradayName).toBeTruthy();
+    expect(added.body.row.BlockParty).toBe('No');
     // v3.4.3.1: adding a party writes a work report too.
     const logged = await count(
       sql<{ n: number }>`
@@ -56,6 +57,9 @@ describe.skipIf(!hasDb)('Party Master via the master engine (integration)', () =
       BlockParty: 'Yes',
       BlockReason: 'dues',
     });
+    // The grid's Block Party column (gridColumnsAlso), as the form's Yes / No.
+    const listed = (await h.user.post(`${API}/list`).send({ ids: [next] })).body as GridRow[];
+    expect(listed[0]).toMatchObject({ partyMkm: next, BlockParty: 'Yes' });
     // An Operator's later edit keeps the block.
     await h.user
       .post(`${API}/save`)
