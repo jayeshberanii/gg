@@ -116,10 +116,93 @@ tables the desktop sends to Excel download as CSV.
 - Ctrl+T and Ctrl+9 are browser shortcuts (new tab, last tab) that a page cannot take over; the
   menu items do the same.
 
+## Cards (Print Report › Full Card …, Main Report As Agam Suchi New)
+
+Code: `apps/api/src/reports/kruti-cards.ts`, actions in `master/screens/card-actions.ts`
+(`full-card-portrait`, `full-card-landscape`, `agam-suchi-new`). Output: a report page
+(`ReportDocument`, see `reports.md`) with Save and Print.
+
+What the source gives and what it does not:
+
+- The Excel templates (`\data\KrutiCard.xls`, `\data\KrutiMater Card.xls`) are **not in the
+  repo** (there is no `data` folder beside the EXE). The handlers decide which value goes into
+  which cell; the template's own heading lines (rows 1–5), column widths, fonts, borders and page
+  setup are unknown. The web page has no heading lines and its column widths are a guess.
+- The `.rpt` files are Crystal's encrypted format and cannot be read (see `letter-bhet.md`).
+
+**Full Card Portrait** (`FullCardPortraitToolStripMenuItem_Click`, sheet "Vertical", A–G). For
+every row the grid shows (`dv.ToTable`, in the grid's order): the record as `GetDataTable` reads
+it (the tblSearch column list) and tblSearch's `KrutiNoteTran` / `krutiRelTran` queries.
+
+| Line | A                     | B                                                               | C                                         | D–G                   |
+| ---- | --------------------- | --------------------------------------------------------------- | ----------------------------------------- | --------------------- |
+| 1    | KrutiNo (15 pt)       | extranm (BhashaTran)                                            | SwaroopTran                               | note 1                |
+| 2    | up levels' KrutiNo    | AuthorTran                                                      | KrutiTypeName                             | note 2                |
+| 3    | PurnaName             | KrutiParimnTran " ," prasastitypeName, a space, prasastipariman | samvattypeName rachsamvat(samvatkindName) | note 3                |
+| 4    | krutireflibnoTran     | KrutiNmTran                                                     | rachnasthalname                           | note 4                |
+| 5…   |                       |                                                                 |                                           | notes past the fourth |
+| last | adivakya (A–C merged) |                                                                 |                                           | antvakya (D–G merged) |
+
+A note's cells: D `ColShortNm-SeriesName`, E `wordnm`, F the publication, G
+`<RefPlace> पृष्ठ-<pgno> <Sign>`.
+
+**Full Card Landscape** (`FullCardToolStripMenuItem_Click`, sheet "Sheet1", A–H): line 1
+KrutiNo, krutiname, –, `[कर्ता  ]samvattypeName rachsamvat` (कर्ता when `extraid2` contains 1);
+line 2 –, extranm, –, rachnasthalname; line 3 PurnaName, –, KrutiTypeName, KrutiHeadName; line 4
+granthagra, –, `prasastitypeName prasastipariman`, –; notes in E–H (E is
+`KrutiColName-SeriesName`); last line adivakya (A–C), antvakya (E–H). The cells marked – are
+filled from text boxes the handler never loads (`FillCommonDataTable` is commented out), so they
+are empty: up levels, other names, swaroop, bhasha, author, pariman, lib nos, mul.
+
+**Main Report As Agam Suchi New** (`MainReportAsAgamSuchiNewToolStripMenuItem_Click`): the same
+questions as Main Report As Agam Suchi (Sampraday, its krutis, "Do yo Want to Print Adi/Ant
+Vakya?"), `SetTranIds`, then Crystal `KrutiAkaradiAgamSuchiReport.rpt` with `@SampradayKt`,
+`@PrintAdiAnt`, `@PrintSwaroopShortName = 0`. Its procedure is
+`PrintKrutiAkaradiAgamSuchiCrystalReport`: one line per kruti carrying its group's number, name
+and size (`MainSeqStr`, `KrutiParichayakName`, `MainSeqCountStr`). **The layout is provisional**:
+the lines are printed under "`<MainSeqStr>. <name> (<count>)`" headings in the seven columns of
+the Agam Suchi page (क्रम, स्वरूप, उ.क्र., कर्ता, भाषा, संवत्, detail), which shows the same list.
+`RefLibNo` / `RefPgNo` are returned but not printed (unknown whether the Crystal layout shows
+them).
+
+Deliberate differences:
+
+- **These items fail on the desktop as written**; the web prints what the handlers are written
+  to produce.
+  - Landscape never opens the copied workbook (`objXL.Sheets("Sheet1")` with no workbook), so it
+    stops with Excel's error before writing a cell. It also reads `KrutiHeadName`, which the
+    record query does not return (empty here).
+  - Both read the note's `prakashankt`, a column tblSearch's note query no longer has, so
+    Portrait stops at the first kruti that has a note. The web prints the note's book copy
+    (`BooktName`, the LibNo), as the form's own note summary does (`-प्र.क्र.-<LibNo>`).
+- One page instead of an Excel workbook; no "Export finished!" message. Orientation is chosen in
+  the browser's print dialog.
+- Each kruti is a table of its own; the desktop's 1-point separator row and the Adi/Ant row
+  height (14/16 pt per 50 characters) are not reproduced: the row grows with its text.
+- At most 2000 cards in one page (400 above that); the three queries run once for all krutis
+  instead of once per kruti.
+- `TranIds` is written, read and cleared in one transaction (see `reports.md`).
+
+Not ported, and why:
+
+- **Crystal Report** (`KrutiFullCard`, parameters `@StrId`, `@IsReport = 1`): `KrutiFullCard.rpt`
+  is not in the repo, not in `Library.vbproj` as an embedded resource and not inside the built
+  `Library.exe` (which embeds the 14 other reports), so the desktop cannot load it either. Only
+  the generated class `KrutiFullCard.vb` (three sections) exists. Its data is probably the
+  procedure `PrintKruti @StrId, @IsReport`; the layout is not recoverable.
+- **Old Full Card** ("KrutiMater Card.xls", sheet "Kruti New Card"): the template is missing and
+  the handler cannot run: it reads `kartaremark` from the grid (no such column in tblSearch or
+  `krutiMst`) and `sankhya`, `Sign`, `prakashan` from a note query that does not select them.
+- **Old Selected Card**: opens `FormPrintWithSelectedColumn` with thirteen column names and a SQL
+  text, and does nothing with the result; "Display In Grid" only closes that form, and the form
+  never reads `SqlStr`. Nothing is printed on the desktop.
+
+Tests: `apps/api/test/reports-cards.integration.test.ts`.
+
 ## Not available on the web
 
-- Full Card Landscape / Portrait, Old Full Card, Old Selected Card, Crystal Report, Main Report As
-  Agam Suchi New: Excel templates and Crystal Reports on the desktop computers.
+- Crystal Report, Old Full Card, Old Selected Card: see "Cards" above (none of them produces
+  anything on the desktop either).
 - Swroop Report / Purna Swroop Report do nothing on the desktop either (their data table is
   always empty).
 - Note Report's third choice (Short) fails on the desktop and says so here.

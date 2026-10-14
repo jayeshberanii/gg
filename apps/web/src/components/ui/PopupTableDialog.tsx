@@ -8,7 +8,8 @@ import { Modal } from './Modal';
 
 /**
  * CommonLibrary.frmPopup: a maximized, read-only grid of a table (columns filling the width,
- * text wrapping) with "Send To Excel" on its right-click menu; Esc closes it.
+ * text wrapping) with "Send To Excel" on its right-click menu; Esc closes it. F3 shows the
+ * current cell in frmBixtextbox (BigTextHost reads the cell marked aria-selected).
  */
 export function PopupTableDialog({
   title = '',
@@ -67,6 +68,7 @@ export function PopupTableDialog({
                   <td
                     key={c}
                     role="gridcell"
+                    aria-selected={current.r === r && current.c === c}
                     onMouseDown={() => setCurrent({ r, c })}
                     className={`border border-light-steel-blue px-1 break-words whitespace-pre-wrap ${
                       current.r === r && current.c === c ? 'bg-selection text-white' : ''

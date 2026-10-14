@@ -16,6 +16,8 @@ type Props = {
   initialFocus?: string;
   /** WindowState = Maximized: the dialog fills the screen. */
   maximized?: boolean;
+  /** MaximizeBox: the title bar's maximize / restore button. */
+  onToggleMaximize?: () => void;
   /** The dialog's own keys, handled before Esc closes it. */
   onKeyDown?: (e: React.KeyboardEvent) => void;
 };
@@ -33,6 +35,7 @@ export function Modal({
   className = 'bg-control',
   initialFocus,
   maximized = false,
+  onToggleMaximize,
   onKeyDown: onOwnKeyDown,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
@@ -88,6 +91,17 @@ export function Modal({
           <h2 id={titleId} className="flex-1 truncate font-normal">
             {title}
           </h2>
+          {onToggleMaximize && (
+            <button
+              type="button"
+              data-caption
+              aria-label={maximized ? 'Restore Down' : 'Maximize'}
+              onClick={onToggleMaximize}
+              className="win-caption-button"
+            >
+              {maximized ? '❐' : '☐'}
+            </button>
+          )}
           {onClose && (
             <button
               type="button"

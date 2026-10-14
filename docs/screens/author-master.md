@@ -164,12 +164,53 @@ Waiting for the upgraded database (not built): the Patrika reference in the Name
 (`authmast.AuthorNameRefPatrikaKt`), Print Report › Author Check Report (procedure
 `PrintAuthorCheckReport`), and Print Author Info's new SQL (same missing column; the item is
 commented out in the web menu anyway). Show Image of RefrenceT now reads its path from
-`GeneralConfig` on the desktop — not available on the web.
+`GeneralConfig` on the desktop; the web reads `REFERENCET_PATH` (see the section below).
+
+## Show Image of RefrenceT for Selected Record (frmDisplayImages, ported 2026-10-13)
+
+Desktop (`frmAuthorMaster.vb:2423`): for the grid's selected rows,
+`select distinct r.LibNo, r.Pgno from RefrenceT R where isnull(r.LibNo,'')<>'' AND isnull(r.Pgno,'')<>'' AND r.Tablekt=<TableKt> and r.RecordKt in(<ids>)`,
+each row a `clsImages` (Folder = LibNo, File = Pgno), handed to `frmDisplayImages` with
+`MainPath = ReferenceTPath` (`F:\scantesting\`; v3.4.3.1: `GeneralConfig`'s ReferenceTPath).
+`TableKt` is the `columnmaster` row 'PrakMast' on **both** Author and Prakashak Master, so an
+author and a prakashak with the same id share their reference rows.
+
+`frmDisplayImages_Load` turns each row into files: the folder is the first directory anywhere
+under MainPath whose path contains `<LibNo>_`, else `<MainPath><LibNo>`; the files are
+`<page>.jpg` for each page of Pgno — a comma list, or `from-to` for a run of page numbers. Files
+that do not exist are collected into "Following Files Not Found : " + one path per line, shown
+once the form has loaded. The form (maximized, LightSteelBlue, title "frmDisplayImages") shows the
+files six at a time in two rows of three 330×330 boxes (StretchImage), with a toolbar: Exit,
+`<<`, `<`, "Page" [combo of pages] "of" [pages], `>`, `>>`, "Total Records" [count]. A double
+click on a picture opens the file (`Process.Start`), or says "Image not Found" on an empty box.
+
+Web: action `refrence-images` (`apps/api/src/master/reference-images.ts`) does the lookup against
+the server's copy of the folder (root `referenceT`: `REFERENCET_PATH` / `REFERENCET_DIR`, or
+`LIBRARY_FILES_DIR/scantesting`) and returns the files by their desktop paths plus the message;
+`DisplayImagesDialog` is the form (maximized dialog, same toolbar, the boxes grow with the window
+as `ResizeControl` does), each picture served by `GET /api/master/<screen>/library-file?path=`.
+A double click opens the image viewer (`features/master/ImageViewer.tsx`) over all the files, at that picture.
+
+Deliberate differences (desktop slips not copied):
+
+- **Pages.** The desktop sets the page count to `lstFiles.Count / 6` rounded to the nearest whole
+  number (banker's rounding), so 7, 8, 13 or 14 pictures leave the last ones on no page; `>>` goes
+  to the last page but keeps the previous page's pictures. The web has ⌈n / 6⌉ pages and every
+  button shows that page's pictures.
+- **Pgno with commas.** The desktop splits on "," but then tests the _whole_ text for a range, so
+  `1-3,7` shows 1 to 3 and never 7, and `1,2-4,6-8` looks for `2-4.jpg`. The web reads each comma
+  part on its own (`1-3,7` → 1, 2, 3, 7), trims blanks around a part, and takes a part that is not
+  two numbers around one "-" as a file name. A run is capped at 1,000 pages.
+- File names are matched without regard to case (the desktop's `File.Exists` on Windows does the
+  same; the server's file system may not).
+- The "Files Not Found" message comes before the dialog opens rather than over it. With no row
+  selected the desktop fails on `Substring`; the web opens the empty form.
+- The form is a dialog over the screen, not another MDI child.
+
+Tests: `apps/api/test/master-library-files.integration.test.ts`.
 
 ## Not available on the web
 
-- Show Image of RefrenceT: files on `F:\scantesting`, which the web server cannot reach. It
-  says so.
 - Show Attachment: `CommonLibrary.frmAttachments`, ported as `AttachmentsDialog` (see
   "Attachments" below).
 

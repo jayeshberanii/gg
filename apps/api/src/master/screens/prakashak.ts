@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { type RawBuilder, sql } from 'kysely';
 import { type Executor, idList } from '../../db/legacy-sql.js';
 import { queryLongRunning } from '../../db/long-running.js';
+import { referenceImages } from '../reference-images.js';
 import { normalizeValue } from '../values.js';
 import { authorMaster } from './author.js';
 import { AUTHOR_LIST, anyNames } from './book.js';
@@ -399,6 +400,19 @@ export const prakashakMaster: ScreenDefinition = {
   workReport: true,
   deleteLabelColumn: 'prakname',
   help: true,
+  /**
+   * Samvat: tblSearch's own PrintColumn adds the int Vksamvat to the text ("Conversion failed
+   * when converting the nvarchar value … to data type int", on the desktop too) and looks the
+   * samvat type up in columnmaster instead of samvmast. The same text, with both put right.
+   */
+  printOverrides: {
+    samvattran: `(SELECT STUFF((SELECT ',' + ISNULL(colSamvKind.Name, '') + ' ' + ISNULL(ColAsamvat.samvatname, '') + ' '
+      + ISNULL(PrakMSamvatT.Asamvat, '') + ' ' + ISNULL(CAST(PrakMSamvatT.Vksamvat AS NVARCHAR(20)), '')
+      FROM PrakMSamvatT LEFT OUTER JOIN columnmaster AS colSamvKind ON PrakMSamvatT.SamvatKindKt = colSamvKind.ColumnMastkm
+      LEFT OUTER JOIN samvmast AS ColAsamvat ON PrakMSamvatT.AsamvatKt = ColAsamvat.samvatcokm
+      WHERE PrakMSamvatT.PrakMastKt = prakmast.prakcodekm ORDER BY PrakMSamvatT.seq
+      FOR XML PATH(''), TYPE).value('.', 'nvarchar(max)'), 1, 1, ''))`,
+  },
 
   /**
    * GetValidationMessage (blank name) and the form's own check, which wins: "Please Enter
@@ -443,6 +457,9 @@ export const prakashakMaster: ScreenDefinition = {
       SamudayKt: int(f.SamudayKt),
       Sampark: text(f.Sampark),
       StatusKt: int(f.StatusKt),
+      // The desktop's Finance box is commented out (frmPrakashakMaster.vb:810, repository :318);
+      // the web puts it back on the form, so it is saved with the record.
+      FinanceKt: int(f.FinanceKt),
       txtAuthor,
       txtPrakName: await composePrakName(
         trx,
@@ -457,19 +474,19 @@ export const prakashakMaster: ScreenDefinition = {
       await sql`
         UPDATE prakmast SET prakname = ${v.prakname}, Remark = ${v.Remark}, Finished = ${v.Finished},
           MainSubject = ${v.MainSubject}, txtPrakName = ${v.txtPrakName}, SamudayKt = ${v.SamudayKt},
-          Sampark = ${v.Sampark}, StatusKt = ${v.StatusKt}, txtAuthor = ${v.txtAuthor}, moduser = ${user.id},
+          Sampark = ${v.Sampark}, StatusKt = ${v.StatusKt}, FinanceKt = ${v.FinanceKt}, txtAuthor = ${v.txtAuthor}, moduser = ${user.id},
           moddate = GETDATE()
         WHERE prakcodekm = ${id}
       `.execute(trx);
     } else {
       const { rows } = await sql<{ id: number }>`
         INSERT INTO prakmast (prakname, Remark, Finished, recordno, MainSubject, txtPrakName, SamudayKt, Sampark,
-          StatusKt, txtAuthor, enuser, endate)
+          StatusKt, FinanceKt, txtAuthor, enuser, endate)
         OUTPUT INSERTED.prakcodekm AS id
         VALUES (${v.prakname}, ${v.Remark}, ${v.Finished},
           (SELECT ISNULL(MAX(RecordNo), 0) + 1 FROM prakmast WITH (UPDLOCK, HOLDLOCK)),
-          ${v.MainSubject}, ${v.txtPrakName}, ${v.SamudayKt}, ${v.Sampark}, ${v.StatusKt}, ${v.txtAuthor}, ${user.id},
-          GETDATE())
+          ${v.MainSubject}, ${v.txtPrakName}, ${v.SamudayKt}, ${v.Sampark}, ${v.StatusKt}, ${v.FinanceKt}, ${v.txtAuthor},
+          ${user.id}, GETDATE())
       `.execute(trx);
       prakId = Number(rows[0]!.id);
     }
@@ -607,8 +624,15 @@ export const prakashakMaster: ScreenDefinition = {
   },
 
   lists: { finance: vibhag('PrakMFin') },
+  // Web-only Finance grid column: tblSearch's FinanceKt row (its FinanceName join) is not
+  // DisplayInGrid, and the desktop grid has no Finance.
+  gridColumnsAlso: [{ column: 'FinanceKt' }],
 
   actions: {
+    // Show Image of RefrenceT for Selected Record (frmDisplayImages).
+    async 'refrence-images'(db, _user, selected, ctx): Promise<ActionResult> {
+      return referenceImages(db, ctx.env, await tableKtOf(db, 'PrakMast'), selected);
+    },
     async 'mark-physically-checked'(db, _user, selected): Promise<ActionResult> {
       await sql`UPDATE prakmast SET Exist = N'PC' WHERE prakcodekm IN ${idList(selected)}`.execute(
         db,

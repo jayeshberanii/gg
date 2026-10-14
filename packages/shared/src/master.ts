@@ -169,6 +169,27 @@ export type Attachment = {
   exists: boolean;
 };
 
+/**
+ * A folder of the desktop's file folders (scans, e-books …) as a file dialog lists it. Every
+ * `path` is the desktop's own (\\server\share\…); `parent` is '' for a configured folder
+ * (the list of them is above it) and null for that list itself.
+ */
+export type LibraryFolder = {
+  path: string;
+  parent: string | null;
+  folders: { name: string; path: string }[];
+  files: { name: string; path: string }[];
+};
+
+/**
+ * A file of the desktop's folders, as the image viewer opens it: shown as a picture (multi-page
+ * scans page by page), in the browser's PDF viewer, or not at all (downloaded instead).
+ */
+export type LibraryFileInfo = {
+  kind: 'image' | 'pdf' | 'other';
+  pages: number;
+};
+
 /** frmAttachments' Save: the files added with New, each as base64. */
 export const saveAttachmentsRequestSchema = z.object({
   files: z

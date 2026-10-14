@@ -58,6 +58,35 @@ export const envSchema = z.object({
    * machine hosts the share). Without it attachments are listed but cannot be opened or changed.
    */
   ATTACHMENT_DIR: z.string().min(1).optional(),
+  /**
+   * The desktop's file folders (scanpath.txt beside the EXE, MdlLib's ReferenceTPath / MainRoot,
+   * Graphics Detail's d:\\tempgr; GeneralConfig from v3.4.3.1). `*_PATH` is the folder as the
+   * desktop computers name it, which is what the database stores and the lists show; `*_DIR` is
+   * the same folder as this server reaches it. LIBRARY_FILES_DIR is a parent folder for the ones
+   * with no `*_DIR` of their own (each under its `*_PATH`'s last part). A folder with neither is
+   * "not configured": its menu items say so.
+   */
+  LIBRARY_FILES_DIR: z.string().min(1).optional(),
+  SCAN_PATH: z.string().min(1).default('\\\\192.168.0.50\\ScanData'),
+  SCAN_DIR: z.string().min(1).optional(),
+  EBOOK_PATH: z.string().min(1).default('\\\\192.168.0.50\\B2 Ebook'),
+  EBOOK_DIR: z.string().min(1).optional(),
+  TITLE_PATH: z.string().min(1).default('\\\\192.168.0.50\\ScanTitle'),
+  TITLE_DIR: z.string().min(1).optional(),
+  GRAPHICS_PATH: z.string().min(1).default('\\\\192.168.0.50\\Graphics'),
+  GRAPHICS_DIR: z.string().min(1).optional(),
+  REFERENCET_PATH: z.string().min(1).default('F:\\scantesting'),
+  REFERENCET_DIR: z.string().min(1).optional(),
+  MAIN_ROOT_PATH: z.string().min(1).default('I:\\LibraryImages'),
+  MAIN_ROOT_DIR: z.string().min(1).optional(),
+  /**
+   * The drive Graphics Detail's pictures are on: graphicbkt.filepath is `Y:\\<LibNo>\\<file>`
+   * (frmGraphicsDetail.updateFilePath's hard-coded "Y:\\"), whatever share the desktops map Y: to.
+   */
+  GRAPHICS_DRIVE_PATH: z.string().min(1).default('Y:'),
+  GRAPHICS_DRIVE_DIR: z.string().min(1).optional(),
+  TEMPGR_PATH: z.string().min(1).default('d:\\tempgr'),
+  TEMPGR_DIR: z.string().min(1).optional(),
   DB_HOST: z.string().min(1),
   DB_PORT: z.coerce.number().int().positive().default(1433),
   DB_NAME: z.string().min(1),

@@ -144,12 +144,12 @@ test('grid: a header click sorts, F3 shows the cell in frmBixtextbox, and Ctrl+/
   await g.cell(0, 'bhashaname').click();
   await expect(gridEl.locator('.ag-row-selected')).toHaveCount(1);
 
-  // clsCommon.DataGridView_KeyDown: F3 opens the value in frmBixtextbox, read-only here.
+  // clsCommon.DataGridView_KeyDown: F3 opens the value in frmBixtextbox; dgMain is ReadOnly, so
+  // there is no Save.
   const value = await g.cell(0, 'bhashaname').innerText();
   await page.keyboard.press('F3');
   const big = dialog(page, 'Name');
   await expect(big.getByLabel('Name')).toHaveValue(value);
-  await expect(big.getByLabel('Name')).toHaveAttribute('readonly', '');
   await expect(big.getByRole('button', { name: 'Save' })).toHaveCount(0);
   await big.getByText('Close', { exact: true }).click();
 
@@ -160,6 +160,57 @@ test('grid: a header click sorts, F3 shows the cell in frmBixtextbox, and Ctrl+/
   await expect.poll(rowHeight).toBeGreaterThan(normal);
   await page.keyboard.press('Control+-');
   await expect.poll(rowHeight).toBe(normal);
+});
+
+test('F3 in a text box opens its text in frmBixtextbox, and Save writes it back', async ({
+  page,
+}) => {
+  const win = await openScreen(page);
+  await win.getByRole('button', { name: 'New' }).click();
+  await win.getByLabel('Brief').fill('typed in the box');
+
+  // clsCommon.Txt_KeyDown: the box is not ReadOnly, so the window has Save.
+  await win.getByLabel('Brief').press('F3');
+  const big = dialog(page, 'Brief');
+  await expect(big.getByLabel('Brief')).toHaveValue('typed in the box');
+  await big.getByLabel('Brief').fill('edited in the big box');
+  await big.getByText('Save', { exact: true }).click();
+  await expect(win.getByLabel('Brief')).toHaveValue('edited in the big box');
+  await expect(win.getByLabel('Brief')).toBeFocused();
+
+  // Close leaves the box as it was.
+  await win.getByLabel('Brief').press('F3');
+  const box = big.getByLabel('Brief');
+
+  // frmBixtextbox.txtSearch_KeyDown: F7 finds a text (ignoring case), F8 the next one.
+  await box.fill('one Two three two');
+  await box.press('F7');
+  const ask = dialog(page, 'Search');
+  await ask.getByRole('textbox').fill('two');
+  await ask.getByRole('button', { name: 'OK' }).click();
+  const selection = () =>
+    box.evaluate((el: HTMLTextAreaElement) => [el.selectionStart, el.selectionEnd]);
+  await expect.poll(selection).toEqual([4, 7]);
+  await box.press('F8');
+  await expect.poll(selection).toEqual([14, 17]);
+
+  // SetFont: 15pt, Ctrl + adds 10pt and Ctrl - takes it off, never below 15pt; Ctrl+M
+  // maximizes (20pt) and the title bar's button restores.
+  const fontSize = () => box.evaluate((el) => getComputedStyle(el).fontSize);
+  expect(await fontSize()).toBe('20px');
+  await box.press('Control+=');
+  await expect.poll(fontSize).toBe('33.3333px');
+  await box.press('Control+-');
+  await box.press('Control+-');
+  await expect.poll(fontSize).toBe('20px');
+  await box.press('Control+m');
+  await expect.poll(fontSize).toBe('26.6667px');
+  await big.getByRole('button', { name: 'Restore Down' }).click();
+  await expect.poll(fontSize).toBe('20px');
+
+  await box.fill('thrown away');
+  await big.getByText('Close', { exact: true }).click();
+  await expect(win.getByLabel('Brief')).toHaveValue('edited in the big box');
 });
 
 test('dgMain is MultiSelect: Ctrl-click, Shift-click, Shift+arrows and Ctrl+A', async ({

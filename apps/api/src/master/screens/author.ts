@@ -10,6 +10,7 @@ import {
   authorReport,
   krutiFromAuthorReport,
 } from '../../reports/author.js';
+import { referenceImages } from '../reference-images.js';
 import { normalizeRow, normalizeValue, pickListOf } from '../values.js';
 import { netString, prepareWorkReport, signBetween, writeWorkReport } from '../work-report-log.js';
 import type { ActionContext, ScreenDefinition, TransDefinition } from './registry.js';
@@ -1229,6 +1230,10 @@ export const authorMaster: ScreenDefinition = {
   },
 
   actions: {
+    // Show Image of RefrenceT for Selected Record (frmDisplayImages).
+    async 'refrence-images'(db, _user, selected, ctx) {
+      return referenceImages(db, ctx.env, await tableKt(db), selected);
+    },
     async 'mark-physically-checked'(db, _user, selected) {
       await sql`UPDATE authmast SET Marking = N'PC' WHERE authorcokm IN ${toIdsSql(selected)}`.execute(
         db,

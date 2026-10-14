@@ -23,6 +23,7 @@ import {
   text,
   val,
 } from './book-common.js';
+import { krutiCardActions } from './card-actions.js';
 import { krutiActions, resetSamvatlessVk, updateKrutiAuthor } from './kruti-actions.js';
 import { trustedSql } from '../../db/trusted-sql.js';
 import type { ScreenDefinition, TransDefinition } from './registry.js';
@@ -1181,7 +1182,7 @@ export const krutiMaster: ScreenDefinition = {
       WHERE c.Vibhag = 'ParimnType' GROUP BY kp.parimantypkt, c.name ORDER BY c.Name`),
   },
 
-  actions: krutiActions,
+  actions: { ...krutiActions, ...krutiCardActions },
 };
 
 export { TRANS as KRUTI_TRANS };

@@ -108,17 +108,98 @@ window, or say the desktop's "No Record Found".
   change on New.
 - The Magazine Vishesh popup box is invisible on the desktop and is not ported.
 
+## Cards (Print › Full Card Portrait, Samvat Report In Range)
+
+**Full Card Portrait** (`FullCardPortraitToolStripMenuItem_Click`) is on the web: action
+`full-card-portrait` (`master/screens/card-actions.ts`), builder
+`apps/api/src/reports/book-cards.ts`, output a report page (`ReportDocument`).
+
+- Asks "Do You Want to Print Column No?" (Yes / No). All the answer changes on the desktop is
+  whether the Parichayak Name follows the book's name; the same here.
+- Data: the handler's two queries over the **selected** rows: the book with its main copy
+  (`BookT.MainL = 1`; a book with two main copies gives two cards) and the krutis its copies are
+  referred to by (`krutireflibno`), ordered by KrutiNo.
+- The template (`\data\prakashan Card.xls`, sheet "Vertical", A–F) is **not in the repo**: its
+  heading lines (rows 1–6), widths, fonts and page setup are unknown. Cells per book:
+
+| Line | A                                                                | B                               | C                                   | D–F                                                        |
+| ---- | ---------------------------------------------------------------- | ------------------------------- | ----------------------------------- | ---------------------------------------------------------- |
+| 1    | PrintNo (15 pt)                                                  | BookName Part[(ParichayakName)] | samvat type / PSamvat (two lines)   | kruti 1: `name (bhasha) (KrutiNo)`, author, `Pariman lipi` |
+| 2    | Shape - Size                                                     | txtPrakashak                    | Price                               | kruti 2                                                    |
+| 3    | Quality                                                          | GMala[ - GMalaNo]               | (PrakSthal: empty)                  | kruti 3                                                    |
+| 4    |                                                                  | txtAuthor                       | txtLipi                             | kruti 4                                                    |
+| 5    | Avruti                                                           | Pages                           | Bhandar / LibNo / `ISBN- …` (lines) | kruti 5 (more lines when the book has more)                |
+| last | txtVishesh (`ShortNm(Detail),…` of `praksnVisheshT`), A–F merged |                                 |                                     |                                                            |
+
+Deliberate differences:
+
+- **The item fails on the desktop as written**: it never opens the copied workbook
+  (`objXL.Sheets("Vertical")` with no workbook open), and it reads `PrakSthal`, a column its
+  query does not select (the join is commented out). The web prints what the handler is written
+  to produce; the PrakSthal cell is empty.
+- The desktop splits a Vishesh longer than 2674 characters over two rows and drops one character
+  between them; here it is one cell.
+- Books are printed in `BookMastkm` order (the desktop's query has no ORDER BY). At most 2000
+  cards. One page instead of an Excel workbook; no "Export finished!" message.
+
+**Samvat Report In Range** (admins) is **not ported**; the menu item still says so. The handler
+(`SamvatReportInRangeToolStripMenuItem_Click`) asks which of four reports to run
+(`frmSearchAndSave`: Kruti / Booke / Author / Prakashak Report, True/False each), then "Press
+(Yes) to Show Data in Crystal Report / Press (No) to Show Data in Excel", then a "From-To Report
+No" range per report (and "Enter Start Page No" for Book and Prakashak). Its data is fully in the
+handler (two long queries plus `CMSP_AuthorReport` / `CMSP_PRINTPRAKREPORT`, after rewriting
+`authmast.ktmepno` / `OldAnyanm` and `prakmast.ptempno` without duplicates), and all of it runs
+on this database. What is missing is every layout it prints into: the four Crystal reports
+(`KrutiReport.rpt`, `BookReport.rpt`, `AuthorReport.rpt`, `PrakashakReport.rpt`) are encrypted and
+unreadable, and the Excel branch fills templates that are not in the repo (`swroopheadCard.xls`,
+`SamvatRpt.xls`). Only the datasets' column lists are known (`DBLibSQLDataSet.xsd`: KrutiReport
+`pno, Group, Swaroop, page, Author, Rsamvatvir, Vishesh, Head`; BookReport `PrintNo, BookName,
+Prakashak, txtAuthor, PSamvatVK, TotalPages, VibhagName1 …`; AuthorReport `SrNo, Author, KPNo`).
+The report site's Kruti Report, Book Report and Author Report (already on the web, see
+`reports.md`) print the same lists from their own procedures. To port this item, a printout or
+PDF of each of the four Crystal reports is needed, or the two templates.
+
+Tests: `apps/api/test/reports-cards.integration.test.ts`.
+
+## Files on the library folders (ported 2026-10-13)
+
+The desktop reads the scan / e-book / title / graphics shares named in `scanpath.txt` (v3.4.3.1:
+`GeneralConfig`'s ScanPath, EBookPath, TitlePath). The web reads the **server's** copies of those
+folders (`apps/api/src/master/library-files.ts`: roots `scan`, `ebook`, `title`, `graphics`; the
+settings and the path mapping are described in `graphics-detail.md`, "Files / disk"). A folder that
+is not configured answers "The … folder is not configured on the server".
+
+| Item                                           | Action             | What it does                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ---------------------------------------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| For Current Record › View Image of This Book   | `view-image`       | SN / EB / TIT / GR: the `.jpg` / `.tif` / `.pdf` files of the book's first LibNo that has any, in the list form; the picked file opens in the image viewer at that file (Previous / Next Page step through the whole list, a multi-page TIF page by page, a PDF in the browser's PDF viewer; `GET library-file`, `library-file/info`) and the list comes back when the viewer closes, until the list is closed |
+| For Current Record › Utility › Check For Image | `check-image`      | `ViewImageSignToolStripMenuItem_Click`: for each LibNo of the row (`txtBookTran` split on ","), `SN` when the scan folder has **more than one** folder or more than one file named `*<LibNo>*.*` anywhere under it (`> 1`, as written), `EB` / `TIT` when the e-book / title folder has at least one. The signs are added to the Info box with `SignBetweenStr`, once per LibNo (so they can repeat)           |
+| ScanData Folder Info                           | `scan-folder-info` | The folders at the top of the scan folder; the first 7 characters of every name longer than 7 are a LibNo; `BookName, Libno, Part, PSamvatVK, TotalPages, txtPrakashak, txtAuthor, Avrutiname` of those BookT rows go to Excel. No folders: "Files Not Found"                                                                                                                                                  |
+
+Deliberate differences:
+
+- **Check For Image** sits in "For Current Record › Utility", which is commented out of the web
+  menu as a whole (with Delete Petank, Add/Edit MS Data and Copy Subject); the item inside the
+  comment is the real one and works as soon as the submenu is shown.
+- Check For Image skips blank LibNos (on the desktop a blank one matches every file, so all three
+  signs are added), and walks each folder once for all the LibNos instead of twice per LibNo.
+- ScanData Folder Info reads the configured scan folder, as v3.4.3.1 does (v3.3.3.6 had
+  `\\192.168.0.210\ScanData` in the code). The LibNos are bound as one parameter
+  (`libNoList`) instead of going through the shared `TranIds` table. A scan folder whose names
+  are all 7 characters or shorter gives an empty sheet (the desktop fails on `Substring`).
+
 ## Not available on the web
 
-- View Image (SN/EB/TIT/GR), Check For Image, ScanData Folder Info: files on the office's shares.
-- Generate New Report No, Samvat Report In Range, Full Card Portrait: Crystal Reports / Excel
-  templates on the desktop.
+- Generate New Report No: Crystal Reports / Excel templates on the desktop.
+- Samvat Report In Range: see "Cards" above.
 - Vishesh Report, Add in Magazine Master, Show MagBookMT, User Detail (frmSearchUser), BookT's
   Update Mix Sign: not built yet; they say so.
 - Delete's check of `GranthLibNoT` in the Coding database (a second database the web does not use).
 
 ## Verified
 
+- `apps/api/test/master-library-files.integration.test.ts` (real DB rolled back, the folders a
+  temporary directory): View Image and the file it serves, Check For Image, ScanData Folder Info,
+  and the Library No form's four Utility items.
 - `apps/api/test/master-book.integration.test.ts` (7 tests, real DB, rolled back): list limit and
   operator filter, validation (incl. the int conversion message), add with every popup, edit that
   keeps unopened children and Vishesh details, clearing the Prakashak box, delete refused then
@@ -175,11 +256,34 @@ window, or say the desktop's "No Record Found".
 - **Library No, Delete** (`frmBookTranNew.vb:1062`): a Book Confirmation counts as in use only
   while `BookConfirmationStatus = 'Sent'`, a Lab Issue only while its status is not Closed or
   CancelReq (`IN_USE` in `book-tran.ts`).
-- **Library No, Utility menu**: the four new items read the scan and e-book folders of the
-  office's shares and compare them with `BookTranMixSignT`, so they are desktop-only
-  (`desktopOnlyMessage`): "Update SN Not Exist In MixSign But Exist In Path", "Update EB Not Exist
-  In MixSign But Exist In Path", "Update SN Exist In MixSign But Not Exist In Path", and a fourth
-  captioned again "Update EB Not Exist In MixSign But Exist In Path".
+- **Library No, Utility menu** (`frmBookTranNew.vb:1867-2021`, ported 2026-10-13; actions in
+  `book-tran.ts`). The four items compare the rows' SN / EB mix signs with the scan and e-book
+  folders. "In the path" means: the name up to the first `_` of each folder at the top of the
+  scan folder (SN), or of each `*.pdf` anywhere under the e-book folder (EB), unless that name
+  starts with `SN` / `EB` itself. "Has the sign" means one of `SN`, `SN(SC)`, `SN(Tif-clear)`,
+  `SN(Tif-Not Clear)` (SN) or `EB`, `EB (Doc-Original)`, `EB(o)`, `EB(O-Proof)` (EB).
+  - "Update SN Not Exist In MixSign But Exist In Path" / "Update EB Not Exist In MixSign But Exist
+    In Path" (`UpdateSNEB`, action `mixsign-in-path`): the BookT rows in the path without the
+    sign. None: "No Records Found". Else "Total(n) Records Found. / Press(Yes) to see the records
+    in Excel / Press(No) to update the records": Yes sends `Tid` + `SNLIbNo` (or `EB LIbNo`) to
+    Excel, No gives those rows the sign and says "Records Added Successfully".
+  - "Update SN Exist In MixSign But Not Exist In Path" and the fourth item, which the designer
+    captions "Update EB Not Exist In MixSign But Exist In Path" again
+    (`UpdateEBNotExistInMixSignButExistInPathToolStripMenuItem` → `CheckNoUpdatedSNEBSign("EB")`,
+    action `mixsign-not-in-path`): the rows that have the sign and nothing in the path (LibNos
+    starting with `SN` / `EB` left out), straight to Excel as `BookTKt` + `SN LIbNo` (both lists
+    carry that heading). Despite "Update", nothing is written.
+  - **Deliberate difference, until the database is upgraded:** the desktop reads and writes the
+    signs in `BookTranMixSignT` (`INSERT … (BookTKt, MixSignKt, Seq, enuser, endate)` with the
+    `visheshMast` CHKBX row of `SN` / `EB`). This database has no such table yet, so the web uses
+    what the Mixsign box still writes: the names between the commas of `BookT.Mixsign`
+    (`,SN,EB,`). "Has the sign" is `',' + Mixsign + ',' LIKE '%,<sign>,%'`; No appends `SN,` /
+    `EB,` (`,SN,` to an empty one). The automatic `{SN}` / `{EB}` marks of the old Update Mix Sign
+    are not those signs. `hasPathSign` and the UPDATE in `mixsign-in-path` are the two places to
+    switch when `BookTranMixSignT` arrives.
+  - Other differences: the LibNos are bound as one parameter instead of the shared `TranIds`
+    table (so two folders of one LibNo list its row once, not twice); an empty folder says "No
+    Records Found" (the desktop fails on `Substring`).
 
 Deliberate differences (v3.4.3.1):
 

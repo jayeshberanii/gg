@@ -1,7 +1,7 @@
 import type { FieldValue, GridValue, PickList } from '@gglib/shared';
 import { BadRequestException } from '@nestjs/common';
 import { type RawBuilder, sql } from 'kysely';
-import type { Executor } from '../../db/legacy-sql.js';
+import { type Executor, textList } from '../../db/legacy-sql.js';
 import { ident } from '../../db/trusted-sql.js';
 import { normalizeValue, pickListOf } from '../values.js';
 
@@ -58,6 +58,17 @@ export function signBetween(
   if (s1.trim() === '') return s2;
   if (s2.trim() === '') return s1;
   return s1.trim() + sign + s2.trim();
+}
+
+/**
+ * Library numbers read off folder and file names, for `IN (...)` (clsCom.SetTranIds(True, list)
+ * and the TranIds table on the desktop, which is one table for everybody): bound as one
+ * parameter. Names that cannot be a library number and would break the split are left out.
+ */
+export function libNoList(libNos: readonly string[]) {
+  // eslint-disable-next-line no-control-regex
+  const usable = libNos.filter((n) => n !== '' && !/[<>~\u0000-\u001f]/.test(n));
+  return textList([...new Set(usable)]);
 }
 
 /** clsCommon.GetcontString: drops the " | " separators UpdateVishay writes, "/" becomes a gap. */

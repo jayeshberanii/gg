@@ -1,6 +1,5 @@
 'use client';
 
-import { desktopOnlyMessage } from '@/features/master/desktopOnly';
 import type { ActionResult, ChildRow, PickList } from '@gglib/shared';
 import { useMemo, useRef, useState } from 'react';
 import type { ContextMenuItem } from '@/components/ui/ContextMenu';
@@ -9,6 +8,7 @@ import { Modal } from '@/components/ui/Modal';
 import { useMessageBox } from '@/components/ui/MessageBox';
 import { PickListDialog, type PickResult } from '@/components/ui/PickListDialog';
 import { MasterScreen } from '@/features/master/MasterScreen';
+import { sendTableToExcel } from '@/features/master/sendToExcel';
 import { netString } from '@/features/master/transSummary';
 import type { FormContext, ScreenActions, ScreenSpec, TransSpec } from '@/features/master/types';
 import type { MasterState } from '@/features/master/useMasterScreen';
@@ -360,29 +360,44 @@ export function BookTranDialog({
             onSelect: a.printSelectedColumn,
           }
         : item('Print Selected Columns', a.printSelectedColumn),
-      // v3.4.3.1: the four items compare BookTranMixSignT with the folders of the office's scan
-      // and e-book shares (the last two captions are the desktop's, the fourth a repeat).
+      // v3.4.3.1: the four items compare the rows' SN / EB mix signs with the scan and e-book
+      // folders. The captions are the desktop's: the last two only list (nothing is updated),
+      // and the fourth repeats the second's caption for "EB in MixSign but not in path".
       {
         kind: 'submenu',
         label: 'Utility',
         items: [
-          'Update SN Not Exist In MixSign But Exist In Path',
-          'Update EB Not Exist In MixSign But Exist In Path',
-          'Update SN Exist In MixSign But Not Exist In Path',
-          'Update EB Not Exist In MixSign But Exist In Path',
-        ].map((label) =>
+          item('Update SN Not Exist In MixSign But Exist In Path', () => void updateSnEb(a, 'SN')),
+          item('Update EB Not Exist In MixSign But Exist In Path', () => void updateSnEb(a, 'EB')),
           item(
-            label,
-            () =>
-              void a.alert(
-                desktopOnlyMessage(
-                  `${label} (it reads the scan and e-book folders of the office's shares)`,
-                ),
-              ),
+            'Update SN Exist In MixSign But Not Exist In Path',
+            () => void a.run('mixsign-not-in-path', { type: 'SN' }, []),
           ),
-        ),
+          item(
+            'Update EB Not Exist In MixSign But Exist In Path',
+            () => void a.run('mixsign-not-in-path', { type: 'EB' }, []),
+          ),
+        ],
       },
     ];
+  }
+
+  /**
+   * UpdateSNEB: the rows whose LibNo has a scan folder (SN) or an e-book (EB) and no such mix
+   * sign; Yes sends them to Excel, No gives them the sign.
+   */
+  async function updateSnEb(a: ScreenActions, type: 'SN' | 'EB') {
+    const r = await a.call('mixsign-in-path', { type }, []);
+    if (!r) return;
+    if (r.kind !== 'table' || r.rows.length === 0) {
+      await a.alert('No Records Found');
+      return;
+    }
+    const answer = await a.yesNoCancel(
+      `Total(${r.rows.length}) Records Found.\r\nPress(Yes) to see the records in Excel\r\nPress(No) to update the records`,
+    );
+    if (answer === 'yes') sendTableToExcel(r.title, r.columns, r.rows);
+    else if (answer === 'no') await a.run('mixsign-in-path', { type, update: true }, []);
   }
 
   /** Delete(): confirm, where the LibNo is used, a row to move those to, then the password. */

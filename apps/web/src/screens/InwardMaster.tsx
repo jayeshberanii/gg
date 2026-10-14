@@ -1,11 +1,11 @@
 'use client';
 
 import { ownerLocked } from '@gglib/shared';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { ContextMenuItem } from '@/components/ui/ContextMenu';
-import { desktopOnlyMessage } from '@/features/master/desktopOnly';
+import { LibraryFileDialog } from '@/features/master/LibraryFileDialog';
 import { MasterScreen } from '@/features/master/MasterScreen';
-import type { FieldSpec, ScreenActions, ScreenSpec } from '@/features/master/types';
+import type { FieldSpec, FormContext, ScreenActions, ScreenSpec } from '@/features/master/types';
 import type { ScreenProps } from './registry';
 import { BookTranDialog } from './BookTranDialog';
 
@@ -47,7 +47,7 @@ const RETURNED = (f: Record<string, string>) => f.returned === 'Yes';
  * Issue › Inward Master (frmInwordMaster, "Inword Master"). Positions, widths and headers are
  * frmInwordMaster.designer.vb's; the behaviour is in docs/screens/inward-master.md.
  */
-const spec: ScreenSpec = {
+const buildSpec = (pickFile: (ctx: FormContext) => void): ScreenSpec => ({
   screen: 'inward-master',
   panelHeight: 388,
   panelWidth: 1008,
@@ -110,10 +110,9 @@ const spec: ScreenSpec = {
     kt('intypekt', 'intypeName', 'In Type', C3, 98, 100),
     box('refno', 'Ref No', C3, 138, 141),
     kt('inbykt', 'InByName', 'In By', C3, 178, 182),
-    // F2 opens an OpenFileDialog on the desktop: the path stays a text box here.
-    box('PCLocation', 'PC Location', C3, 218, 223, {
-      onF2: (ctx) => void ctx.alert(desktopOnlyMessage('Choosing a file for PC Location')),
-    }),
+    // F2 is an OpenFileDialog on the desktop: here it lists the library folders the server
+    // reaches (LibraryFileDialog), and the box can still be typed into.
+    box('PCLocation', 'PC Location', C3, 218, 223, { onF2: pickFile }),
     kt('Statuskt', 'StatusName', 'Status', C3, 258, 264),
     box('returned', 'Returned', C3, 298, 305, { options: ['No', 'Yes'], bitOptions: true }),
     // CheckWorkAsign's count; F2 opens Work Given for this inward (Edit mode only).
@@ -148,10 +147,13 @@ const spec: ScreenSpec = {
   },
   // btnCopy_Click: the copy gets its Vibhag's next VibhagSrNo (the desktop tests Via; see the note).
   copy: { clear: [], loadTrans: [], newDefaults: true },
-};
+});
 
 export function InwardMaster(props: ScreenProps) {
   const [bookTids, setBookTids] = useState<number[] | null>(null);
+  /** txtPCLocation's OpenFileDialog, with the box it fills. */
+  const [picking, setPicking] = useState<FormContext | null>(null);
+  const spec = useMemo(() => buildSpec(setPicking), []);
 
   const menu = (a: ScreenActions): ContextMenuItem[] => [
     {
@@ -201,6 +203,18 @@ export function InwardMaster(props: ScreenProps) {
       <MasterScreen spec={spec} {...props} menu={menu} />
       {bookTids && (
         <BookTranDialog bookId={0} tids={bookTids} showAll onClose={() => setBookTids(null)} />
+      )}
+      {picking && (
+        <LibraryFileDialog
+          screen="inward-master"
+          initialPath={picking.fields.PCLocation ?? ''}
+          onCancel={() => setPicking(null)}
+          onPick={(path) => {
+            // If DLGOPENFile.FileName.Trim <> "" Then txtPCLocation.Text = DLGOPENFile.FileName
+            picking.setField('PCLocation', path);
+            setPicking(null);
+          }}
+        />
       )}
     </>
   );

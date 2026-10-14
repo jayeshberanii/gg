@@ -38,29 +38,29 @@ their boxes; the others 1 to 6 px lower). TabIndex is in brackets.
 
 Column map (the desktop's `SetTextbox` matches `txt<Column>`, and `…kt` boxes show `<col>Name`):
 
-| Column                                                               | Type          | Control / notes                                                                                                                                                                               |
-| -------------------------------------------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `InOut`                                                              | bit           | `cmbInOut`: OUT = 1, IN = 0 (`SelectedItem = "OUT"`). Shows "OUT"/"IN"                                                                                                                        |
-| `Vibhagkt` / `VibhagName`                                            | int           | F2 inline (below); **required**. Picking it sets `VibhagSrNo = GetVibhagSrNo`                                                                                                                 |
-| `VibhagSrNo`                                                         | int           | editable number. 0 or blank at save → the repository assigns `MAX+1` per Vibhag                                                                                                               |
-| `itemkt`, `praptypekt`, `viakt`, `intypekt`, `effortskt`, `Statuskt` | int           | columnmaster F2s (below)                                                                                                                                                                      |
-| `fromkt`, `forkt`                                                    | int           | PartyM F2                                                                                                                                                                                     |
-| `inbykt`                                                             | int           | Usecurity F2                                                                                                                                                                                  |
-| `RefrenceNm`                                                         | nvarchar(150) | F2 earlier values                                                                                                                                                                             |
-| `refno`                                                              | nvarchar(150) | F2 earlier values                                                                                                                                                                             |
-| `paidamount`                                                         | int           | `Val(text)`                                                                                                                                                                                   |
-| `indate`                                                             | datetime      | `dtpindate`, saved as the date (`MM-dd-yyyy`)                                                                                                                                                 |
-| `subject`                                                            | nvarchar(500) | F2 earlier values                                                                                                                                                                             |
-| `detail`                                                             | nvarchar(max) | single-line box; F2 earlier values                                                                                                                                                            |
-| `PCLocation`                                                         | nvarchar(500) | **file path.** Desktop F2 opens an OpenFileDialog. **Web: plain text field**; F2 shows the `desktopOnly` message (decision 2026-10-05), or falls back to the tblSearch list of earlier values |
-| `Physicallocation`                                                   | nvarchar(250) | F2 earlier values                                                                                                                                                                             |
-| `ToReturned`                                                         | bit           | `cmbToReturned` Yes/No                                                                                                                                                                        |
-| `StatusRem`                                                          | nvarchar(500) | F2 earlier values                                                                                                                                                                             |
-| `GeneralRemark`                                                      | nvarchar(250) | F2 earlier values                                                                                                                                                                             |
-| `returned`                                                           | bit           | `cmbReturned` Yes/No. **Yes** shows `dtpreturndate` and hides `txtReturDate`. Anything else shows the disabled blank box (`cmbReturned_SelectedIndexChanged`)                                 |
-| `returndate`                                                         | datetime      | **always saved** from `dtpreturndate.Value`, even when Returned = No and the picker is hidden. None of the 3,533 rows is NULL. Keep this behaviour                                            |
-| `returnremark`                                                       | nvarchar(500) | F2 earlier values                                                                                                                                                                             |
-| `Locked`, `enuser`, `endate`, `moduser`, `moddate`                   |               | not on the form                                                                                                                                                                               |
+| Column                                                               | Type          | Control / notes                                                                                                                                               |
+| -------------------------------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `InOut`                                                              | bit           | `cmbInOut`: OUT = 1, IN = 0 (`SelectedItem = "OUT"`). Shows "OUT"/"IN"                                                                                        |
+| `Vibhagkt` / `VibhagName`                                            | int           | F2 inline (below); **required**. Picking it sets `VibhagSrNo = GetVibhagSrNo`                                                                                 |
+| `VibhagSrNo`                                                         | int           | editable number. 0 or blank at save → the repository assigns `MAX+1` per Vibhag                                                                               |
+| `itemkt`, `praptypekt`, `viakt`, `intypekt`, `effortskt`, `Statuskt` | int           | columnmaster F2s (below)                                                                                                                                      |
+| `fromkt`, `forkt`                                                    | int           | PartyM F2                                                                                                                                                     |
+| `inbykt`                                                             | int           | Usecurity F2                                                                                                                                                  |
+| `RefrenceNm`                                                         | nvarchar(150) | F2 earlier values                                                                                                                                             |
+| `refno`                                                              | nvarchar(150) | F2 earlier values                                                                                                                                             |
+| `paidamount`                                                         | int           | `Val(text)`                                                                                                                                                   |
+| `indate`                                                             | datetime      | `dtpindate`, saved as the date (`MM-dd-yyyy`)                                                                                                                 |
+| `subject`                                                            | nvarchar(500) | F2 earlier values                                                                                                                                             |
+| `detail`                                                             | nvarchar(max) | single-line box; F2 earlier values                                                                                                                            |
+| `PCLocation`                                                         | nvarchar(500) | **file path.** Desktop F2 opens an OpenFileDialog. **Web: text field**; F2 opens a file dialog over the server's library folders (see "Files / disk")         |
+| `Physicallocation`                                                   | nvarchar(250) | F2 earlier values                                                                                                                                             |
+| `ToReturned`                                                         | bit           | `cmbToReturned` Yes/No                                                                                                                                        |
+| `StatusRem`                                                          | nvarchar(500) | F2 earlier values                                                                                                                                             |
+| `GeneralRemark`                                                      | nvarchar(250) | F2 earlier values                                                                                                                                             |
+| `returned`                                                           | bit           | `cmbReturned` Yes/No. **Yes** shows `dtpreturndate` and hides `txtReturDate`. Anything else shows the disabled blank box (`cmbReturned_SelectedIndexChanged`) |
+| `returndate`                                                         | datetime      | **always saved** from `dtpreturndate.Value`, even when Returned = No and the picker is hidden. None of the 3,533 rows is NULL. Keep this behaviour            |
+| `returnremark`                                                       | nvarchar(500) | F2 earlier values                                                                                                                                             |
+| `Locked`, `enuser`, `endate`, `moduser`, `moddate`                   |               | not on the form                                                                                                                                               |
 
 **New** (`btnNew`) runs `clsCom.clear(Panel1)`, which clears **TextBoxes only** (text and Tag).
 The three combos and both date pickers **keep the previous record's values**. That is a harmless
@@ -196,7 +196,26 @@ where this owner rule is live. Only frmWorkGivenMaster has it live as well; Prak
 
 ## Files / disk
 
-`PCLocation` F2 = OpenFileDialog. Deferred: text field plus the `desktopOnly` message.
+`PCLocation` F2 (`Txt_KeyDown`, `frmInwordMaster.vb:367-374`): a plain `OpenFileDialog`
+(`CustomPlaces.Clear()`, no filter, no start folder); a chosen file's full path goes into the box,
+Cancel leaves it alone. Nothing else ever uses the value: Save stores the text
+(`Ent.PCLocation = txtPCLocation.Text.Trim`, nvarchar(500)); the form never opens, copies or
+checks the file. In the local database 9 of 3,533 rows have one, none of them a real file path
+(`!!Raju\!RP_Convert\…` eight times, `\\192.168.0.100` once).
+
+**Web (2026-10-13):** a browser never tells a page the path of a file the user picks, so the
+desktop's dialog cannot be reproduced. F2 opens `LibraryFileDialog` ("Open": Look in, Up, the
+folder's folders and files, File name, Open / Cancel) over the folders the **server** reaches
+(`GET /api/master/inward-master/library-folder?path=`; with no path, the configured folders: scan
+data, e-books, title scans, graphics, reference scans …, see `graphics-detail.md` "Files /
+disk"). Open or a double click on a file puts its path in the box **as the desktop names it**
+(`\\192.168.0.50\ScanData\…`), so the stored value is one the desktop users can open too; Cancel
+changes nothing. The dialog starts in the folder of the box's current path when that is a library
+folder. The box stays a text box, so any other path (a user's own `D:\…`) can still be typed.
+
+Why this and not an upload: the form only stores a location, and an upload would need a new
+folder nobody on the desktop looks in, plus a copy of every file. Files on a user's own computer
+cannot be pointed at from the web; they are typed, as before.
 
 ## Desktop bugs
 
@@ -265,7 +284,8 @@ Deliberate choices and differences:
   refused with a validation message ("… cannot be longer than n characters", "Paid Amount is too
   large"); the desktop lets SQL Server throw.
 - **Paid Amount** has no F2 (its tblSearch SQL is broken); **VibhagSrNo** has none either.
-- **PC Location** is a plain text box; F2 shows the "needs the desktop computers" message.
+- **PC Location**: F2 opens a file dialog over the server's library folders instead of the
+  computer's own drives (see "Files / disk"); the box can also be typed into.
 - **Work Given** box: read-only count; F2 (Edit mode) runs `work-given-of`, which opens Work Given
   Master on that inward's rows (or to add one for it). Work Given is commented out of the menu, so
   the window says "not available on the web yet".
@@ -276,8 +296,8 @@ Deliberate choices and differences:
   typed text, which saves as IN / No anyway).
 
 Desktop bugs: none fixed beyond the overflow messages and the Copy/Via quirk above; the other
-harmless quirks are kept or listed. Deferred: the PC Location file dialog (files are deferred),
-UcSearch's "User Master" search (engine-wide, not built yet).
+harmless quirks are kept or listed. Deferred: UcSearch's "User Master" search (engine-wide, not
+built yet).
 
 The tblSearch data, the Locked flag and the audit columns were checked against the local DB
 (3,533 rows, no NULL `enuser`).

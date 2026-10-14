@@ -47,6 +47,12 @@ function cellText(value: unknown, format?: GridColumnSpec['format']): string {
   return text;
 }
 
+/** DataGridViewColumn.MinimumWidth's default: a column cannot be dragged narrower than this. */
+const DEFAULT_MIN_WIDTH = 5;
+
+/** A column this narrow is a key column the Designer keeps out of sight; it never stretches. */
+const KEY_COLUMN_WIDTH = 8;
+
 /** DataGridView_KeyDown's Ctrl +/- zoom: ±2pt, and it refuses to go below 8pt. */
 const ZOOM_STEP = 2;
 const MIN_POINTS = 8;
@@ -73,6 +79,11 @@ export type DataGridProps = {
   header?: { font?: string; fontSize?: number; color?: string };
   /** Shows AG Grid's loading overlay. */
   loading?: boolean;
+  /**
+   * Stretch the columns in proportion to fill the grid when their own widths leave it short
+   * (the web's window is usually wider than the form the Designer's widths were drawn for).
+   */
+  fillWidth?: boolean;
   /** The current row moved (a click, the arrow keys). */
   onCurrentRowChange?: (row: GridRow | null) => void;
   /** The selected rows changed. */
@@ -108,6 +119,7 @@ export function DataGrid({
   rowTextColor,
   header,
   loading = false,
+  fillWidth = false,
   onCurrentRowChange,
   onSelectionChange,
   onContextMenuRow,
@@ -149,6 +161,7 @@ export function DataGrid({
         headerName: c.header,
         field: c.field,
         width: c.width ?? 100,
+        minWidth: c.minWidth ?? DEFAULT_MIN_WIDTH,
         hide: c.hidden ?? false,
         sortable: true,
         resizable: true,
@@ -167,6 +180,36 @@ export function DataGrid({
       })),
     [columns],
   );
+
+  /** Whether the columns are stretched just now, so a narrower grid can give them back. */
+  const stretched = useRef(false);
+
+  /**
+   * fillWidth: the columns share the grid's width in proportion to their own. The key columns
+   * drawn a few pixels wide to keep them out of sight stay as they are. A grid too narrow for
+   * the columns' own widths gets those back, and scrolls sideways as the desktop's does.
+   */
+  function fitColumns(grid: GridApi<GridRow>, clientWidth: number) {
+    if (!fillWidth || clientWidth <= 0) return;
+    const shown = columns.filter((c) => !c.hidden);
+    // A column narrower than its MinimumWidth is drawn at the minimum.
+    const widthOf = (c: GridColumnSpec) =>
+      Math.max(c.width ?? 100, c.minWidth ?? DEFAULT_MIN_WIDTH);
+    const designed = shown.reduce((sum, c) => sum + widthOf(c), 0);
+    if (designed < clientWidth) {
+      grid.sizeColumnsToFit({
+        columnLimits: shown
+          .filter((c) => widthOf(c) <= KEY_COLUMN_WIDTH)
+          .map((c) => ({ key: c.field, maxWidth: widthOf(c) })),
+      });
+      stretched.current = true;
+    } else if (stretched.current) {
+      grid.applyColumnState({
+        state: shown.map((c) => ({ colId: c.field, width: widthOf(c) })),
+      });
+      stretched.current = false;
+    }
+  }
 
   /**
    * A DataGridView selects the row you right-click before opening its ContextMenuStrip, so
@@ -341,6 +384,7 @@ export function DataGrid({
           enableClickSelection: false,
         }}
         onGridReady={(e) => (api.current = e.api)}
+        onGridSizeChanged={(e) => fitColumns(e.api, e.clientWidth)}
         onCellFocused={onCellFocused}
         onSelectionChanged={(e) => onSelectionChange?.(e.api.getSelectedRows())}
         suppressCellFocus={false}

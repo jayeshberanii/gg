@@ -2,6 +2,7 @@
 
 import type { ChildRow, GridValue, PickList, TransTable } from '@gglib/shared';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { BigTextBox } from '@/components/ui/BigTextBox';
 import { ContextMenu, type ContextMenuItem } from '@/components/ui/ContextMenu';
 import { InputBox } from '@/components/ui/InputBox';
 import { useMessageBox } from '@/components/ui/MessageBox';
@@ -105,6 +106,8 @@ export function DisplayTransDialog({
   const [nested, setNested] = useState<{ row: number } | null>(null);
   const [menuAt, setMenuAt] = useState<{ x: number; y: number } | null>(null);
   const [finding, setFinding] = useState(false);
+  /** F3 (clsCommon.DataGridView_KeyDown): the current cell in frmBixtextbox. */
+  const [bigText, setBigText] = useState<{ value: string; canSave: boolean } | null>(null);
   /** A cell that asks with an InputBox (TransLookup.input). */
   const [asking, setAsking] = useState<{ row: number; column: string; lookup: TransLookup } | null>(
     null,
@@ -364,7 +367,7 @@ export function DisplayTransDialog({
   }
 
   function onKeyDown(e: React.KeyboardEvent) {
-    if (editing || picking || nested || finding || child || vishay || asking) return;
+    if (editing || picking || nested || finding || child || vishay || asking || bigText) return;
     const column = columnAt(cur.col);
     const key = e.key;
     const handled = () => {
@@ -396,6 +399,14 @@ export function DisplayTransDialog({
     } else if (e.altKey && key.toLowerCase() === 's') {
       handled();
       if (spec.buttons?.save !== false && !viewOnly) void save();
+    } else if (key === 'F3') {
+      handled();
+      // Savebut: the cell is not ReadOnly. A check box cell has no text to edit.
+      if (column && rows[cur.row])
+        setBigText({
+          value: netString(rows[cur.row]![column]),
+          canSave: isEditable(column) && !isBit(column) && !viewOnly,
+        });
     } else if (key === 'F7') {
       handled();
       setFinding(true);
@@ -728,6 +739,19 @@ export function DisplayTransDialog({
           initialText={picking.initialText}
           onCancel={() => void applyPick(picking, null)}
           onPick={(result) => void applyPick(picking, result)}
+        />
+      )}
+
+      {bigText && (
+        <BigTextBox
+          title={columnAt(cur.col)}
+          value={bigText.value}
+          canSave={bigText.canSave}
+          onSave={(text) => {
+            setBigText(null);
+            if (text !== bigText.value) void commitEdit(text);
+          }}
+          onClose={() => setBigText(null)}
         />
       )}
 

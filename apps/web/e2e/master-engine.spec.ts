@@ -54,6 +54,13 @@ test('opens the Work Report (frmDisplayTransNew) once a row is selected, and sav
   // F2 on WorkType: columnmaster's WorkType list.
   await cells.press('F2');
   await pickFirst(page, 'WorkType');
+  // clsCommon.DataGridView_KeyDown: F3 shows the current cell in frmBixtextbox. The pick moved
+  // the cursor on to DoneBy.
+  await cells.press('F3');
+  const big = dialog(page, 'DoneBy');
+  await expect(big.getByRole('textbox')).toHaveValue(scenario.users.reporter);
+  await big.getByText('Close', { exact: true }).click();
+  await expect(big).toBeHidden();
 
   // Alt+S: TsBtnSave closes; nothing is written, so reopening shows the old rows.
   await cells.press('Alt+s');
@@ -64,6 +71,16 @@ test('opens the Work Report (frmDisplayTransNew) once a row is selected, and sav
   await dialog(page, 'frmDisplayTransNew').getByRole('grid').click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Compare Data' }).click();
   await expect(page.getByRole('grid', { name: 'Popup' })).toBeVisible();
+  // frmPopup's grid gets the same F3, when it has a row to show.
+  const compared = page.getByRole('grid', { name: 'Popup' }).getByRole('gridcell');
+  if ((await compared.count()) > 0) {
+    await page.getByRole('grid', { name: 'Popup' }).press('F3');
+    const bigCell = page.getByRole('dialog').last();
+    await expect(bigCell.getByRole('textbox')).toHaveValue(
+      (await compared.first().innerText()).trim(),
+    );
+    await bigCell.getByText('Close', { exact: true }).click();
+  }
   await page.getByRole('grid', { name: 'Popup' }).press('Escape');
   await expect(page.getByRole('grid', { name: 'Popup' })).toBeHidden();
   await dialog(page, 'frmDisplayTransNew').getByRole('grid').press('Escape');

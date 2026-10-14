@@ -42,6 +42,15 @@ test('Compare Data shows the old and new values; Display Count groups the day', 
   const popup = page.getByRole('grid', { name: 'Popup' });
   await expect(popup.getByRole('gridcell', { name: '(Old brief)' })).toBeVisible();
   await expect(popup.getByRole('gridcell', { name: '(New brief)' })).toBeVisible();
+  // clsCommon.DataGridView_KeyDown on frmPopup's grid: F3 shows the current cell in
+  // frmBixtextbox, without Save (dgResult is ReadOnly).
+  await popup.getByRole('gridcell', { name: '(New brief)' }).click();
+  await page.keyboard.press('F3');
+  const big = page.getByRole('dialog').last();
+  await expect(big.getByRole('textbox')).toHaveValue('(New brief)');
+  await expect(big.getByRole('button', { name: 'Save' })).toHaveCount(0);
+  await big.getByText('Close', { exact: true }).click();
+  await expect(popup.getByRole('gridcell', { name: '(New brief)' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(popup).toBeHidden();
 

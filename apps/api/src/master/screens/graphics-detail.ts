@@ -7,6 +7,7 @@ import { trustedSql } from '../../db/trusted-sql.js';
 import { loadTblSearch, recordColumnsSql } from '../tbl-search.js';
 import { normalizeRow, pickListOf } from '../values.js';
 import { get, grid, int, list, nextKey, scalar, table, text, val } from './book-common.js';
+import { graphicsDetailFileActions } from './graphics-detail-files.js';
 import { masterRowsForDetail } from './graphics-master.js';
 import { requestLabIssue } from './lab-issue-common.js';
 import { openInUse, trimmed } from './master-common.js';
@@ -68,7 +69,7 @@ function values(f: Record<string, FieldValue>) {
     grade: trimmed(f.grade),
     pending: bitField(f.pending),
     tempselected: trimmed(f.tempselected),
-    // The desktop's FilePath variable (the picture box): on the web a plain text box.
+    // The desktop's FilePath variable (PicImage's picture: Select Picture / Remove Picture).
     filepath: trimmed(f.filepath),
     Graphickt: int(f.Graphickt),
     remark: trimmed(f.remark),
@@ -543,6 +544,9 @@ export const graphicsDetail: ScreenDefinition = {
   },
 
   actions: {
+    // The items that work on the pictures themselves (graphics-detail-files.ts).
+    ...graphicsDetailFileActions,
+
     /**
      * Ctrl+L / Ctrl+U (InputBoxProc("vis123") → GRAPHICS_LOCK_PASSWORD; the second Security
      * password still works): LockUnlockRecords on the selected rows.

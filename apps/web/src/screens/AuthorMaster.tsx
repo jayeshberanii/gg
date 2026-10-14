@@ -8,6 +8,7 @@ import { MultiCheckboxDialog } from '@/components/ui/MultiCheckboxDialog';
 import { PickListDialog, type PickResult } from '@/components/ui/PickListDialog';
 import { PopupTableDialog } from '@/components/ui/PopupTableDialog';
 import { ADDRESS_TRANS } from '@/features/master/commonTrans';
+import { DisplayImagesDialog } from '@/features/master/DisplayImagesDialog';
 import { MasterScreen } from '@/features/master/MasterScreen';
 import { sendTextToWord } from '@/features/master/sendToExcel';
 import { netString } from '@/features/master/transSummary';
@@ -636,6 +637,8 @@ export function AuthorMaster(props: ScreenProps) {
   const [treeSelected, setTreeSelected] = useState<number | null>(null);
   /** For Selected Record › BookT: the Library No dialog's rows. */
   const [bookTids, setBookTids] = useState<number[] | null>(null);
+  /** frmDisplayImages' lstFiles, while it is open. */
+  const [images, setImages] = useState<string[] | null>(null);
 
   /** clsCom.DisplayListForm over one of the form's fixed lists. */
   function pickFrom(name: string, title: string, selectFirst: boolean): Promise<PickResult | null> {
@@ -764,13 +767,14 @@ export function AuthorMaster(props: ScreenProps) {
       //   run('update-vikram-samvat', undefined, a.selectedIds),
       // ),
       // item('Update pno in Auth-Prak Master', withPassword('update-pno', {}, [])),
-      // item(
-      //   'Show Image of RefrenceT for Selected Record',
-      //   () =>
-      //     void a.alert(
-      //       'The scanned reference images (F:\\scantesting) are on the desktop computers and cannot be shown in the web app.',
-      //     ),
-      // ),
+      // frmDisplayImages over the references' scanned pages (ReferenceTPath), for dgMain's
+      // selected rows.
+      item('Show Image of RefrenceT for Selected Record', async () => {
+        const r = await a.call('refrence-images');
+        if (r?.kind !== 'table') return;
+        if (r.message) await a.alert(r.message);
+        setImages(r.rows.map((row) => String(row[0] ?? '')));
+      }),
       {
         kind: 'submenu',
         label: 'Print Report',
@@ -945,6 +949,13 @@ export function AuthorMaster(props: ScreenProps) {
           columns={dialog.columns}
           rows={dialog.rows}
           onClose={() => setDialog(null)}
+        />
+      )}
+      {images && (
+        <DisplayImagesDialog
+          screen="author-master"
+          files={images}
+          onClose={() => setImages(null)}
         />
       )}
     </>

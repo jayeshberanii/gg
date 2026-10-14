@@ -59,6 +59,12 @@ test('shows the desktop layout and the newest books', async ({ page }) => {
   await expect(grid(page).cell(0, 'txtBookName')).not.toBeEmpty({ timeout: 30_000 });
   // EnableDisableDataEditing: the boxes are read-only until New or Modify.
   await expect(win.getByLabel('Book Name')).toHaveAttribute('readonly', '');
+  // ReadOnly stops typing only: F2 still opens the box's list and the pick goes in the box.
+  const shape = win.getByLabel('ShapeKt');
+  await expect(shape).toHaveAttribute('readonly', '');
+  await shape.press('F2');
+  await pickFirstReal(page, 'ShapeKt');
+  await expect(shape).not.toHaveValue('');
 });
 
 test('adds a book with a language, gives it a library number, then refuses to delete it', async ({

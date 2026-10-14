@@ -10,6 +10,7 @@ import { PickListDialog, type PickResult } from '@/components/ui/PickListDialog'
 import { PopupTableDialog } from '@/components/ui/PopupTableDialog';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { newTempId } from '@/features/master/DisplayTransDialog';
+import { useImageViewer } from '@/features/master/ImageViewer';
 import { MasterScreen } from '@/features/master/MasterScreen';
 import { sendTableToExcel } from '@/features/master/sendToExcel';
 import { bookSummary, netString } from '@/features/master/transSummary';
@@ -765,26 +766,27 @@ function buildSpec(deps: Deps): ScreenSpec {
       },
     ],
     trans: TRANS,
+    // Width and MinimumWidth as frmBookMasterNew.Designer.vb has them (not scaled like the panel).
     columns: [
-      { header: 'bookkm', field: 'BookMastkm', width: 6 },
-      { header: 'BookName(Parichayak Name) -Part', field: 'txtBookName', width: 181 },
-      { header: 'Prakashak', field: 'txtPrakashak', width: 175 },
-      { header: 'Author', field: 'txtAuthor', width: 56 },
-      { header: 'PSamvatVK', field: 'PSamvatVK', width: 49 },
-      { header: 'Bhasha', field: 'txtBhasha', width: 49 },
-      { header: 'Lipi', field: 'txtLipi', width: 49 },
-      { header: 'Pages(Total)', field: 'TotalPages', width: 49 },
-      { header: 'ComGrpNo', field: 'CommonGrpNo', width: 49 },
-      { header: 'LibNo', field: 'txtBookTran', width: 49 },
-      { header: 'LibNoCount', field: 'LibNoCount', width: 105 },
-      { header: 'PartGrpNo', field: 'Grpno', width: 49 },
-      { header: 'Avruti', field: 'AvrutiName', width: 49 },
-      { header: 'Size', field: 'Size', width: 35 },
-      { header: 'RepNo', field: 'PrintNo', width: 35 },
-      { header: 'IssueCount', field: 'IssueCount', width: 105 },
-      { header: 'LinkWithKruti', field: 'LinkWithKrutiName', width: 105 },
-      { header: 'ProjectWork', field: 'ProjectWorkName', width: 105 },
-      { header: 'IsPrint', field: 'IsPrint', width: 42 },
+      { header: 'bookkm', field: 'BookMastkm', width: 8, minWidth: 8 },
+      { header: 'BookName(Parichayak Name) -Part', field: 'txtBookName', width: 258, minWidth: 8 },
+      { header: 'Prakashak', field: 'txtPrakashak', width: 250, minWidth: 8 },
+      { header: 'Author', field: 'txtAuthor', width: 80, minWidth: 8 },
+      { header: 'PSamvatVK', field: 'PSamvatVK', width: 70, minWidth: 70 },
+      { header: 'Bhasha', field: 'txtBhasha', width: 70, minWidth: 70 },
+      { header: 'Lipi', field: 'txtLipi', width: 70, minWidth: 70 },
+      { header: 'Pages(Total)', field: 'TotalPages', width: 70, minWidth: 70 },
+      { header: 'ComGrpNo', field: 'CommonGrpNo', width: 70, minWidth: 70 },
+      { header: 'LibNo', field: 'txtBookTran', width: 70, minWidth: 70 },
+      { header: 'LibNoCount', field: 'LibNoCount', width: 150, minWidth: 8 },
+      { header: 'PartGrpNo', field: 'Grpno', width: 70, minWidth: 70 },
+      { header: 'Avruti', field: 'AvrutiName', width: 70, minWidth: 70 },
+      { header: 'Size', field: 'Size', width: 50, minWidth: 50 },
+      { header: 'RepNo', field: 'PrintNo', width: 50, minWidth: 50 },
+      { header: 'IssueCount', field: 'IssueCount', width: 150, minWidth: 8 },
+      { header: 'LinkWithKruti', field: 'LinkWithKrutiName', width: 150, minWidth: 8 },
+      { header: 'ProjectWork', field: 'ProjectWorkName', width: 150, minWidth: 8 },
+      { header: 'IsPrint', field: 'IsPrint', width: 60, minWidth: 8 },
     ],
     onFieldLeave,
     validate: validateBook,
@@ -838,6 +840,7 @@ const NOT_ON_WEB = (what: string) =>
 
 export function BookMaster(props: ScreenProps) {
   const msg = useMessageBox();
+  const viewer = useImageViewer();
   const workspace = useWorkspace();
   const auth = useAuth();
   const user = auth.status === 'authenticated' ? auth.user : null;
@@ -921,6 +924,27 @@ export function BookMaster(props: ScreenProps) {
         if (password !== null) await a.run(action, { ...extra, password }, ids);
       };
     const notOnWeb = (what: string) => () => void a.alert(NOT_ON_WEB(what));
+    /**
+     * ViewImage(Type): the book's files in the type's folder, in the list form; the picked one
+     * opens (in the image viewer, which also steps through the rest of the list) and the list
+     * comes back when the viewer closes, until the list is closed without a pick.
+     */
+    const viewImage = (type: 'SN' | 'EB' | 'TIT' | 'GR') => async () => {
+      const files = tableList(await a.call('view-image', { type, current }, []));
+      if (files.rows.length === 0) return;
+      const paths = files.rows.map((r) => String(r[0] ?? ''));
+      for (;;) {
+        const picked = await a.pick(files, { title: 'List' });
+        const path = picked?.code[0] ?? '';
+        if (path === '') return;
+        await viewer.open({
+          screen: 'book-master',
+          files: paths,
+          index: Math.max(0, paths.indexOf(path)),
+          title: `View Image of This Book - ${type}`,
+        });
+      }
+    };
     const printVisible =
       user !== null &&
       (user.userType === UserType.Admin ||
@@ -1033,10 +1057,10 @@ export function BookMaster(props: ScreenProps) {
             kind: 'submenu',
             label: 'View Image of This Book',
             items: [
-              item('SN', notOnWeb('Viewing scanned images')),
-              item('EB', notOnWeb('Viewing e-books')),
-              // item('TIT', notOnWeb('Viewing title images')),
-              ...(printVisible ? [item('GR', notOnWeb('Viewing graphics'))] : []),
+              item('SN', viewImage('SN')),
+              item('EB', viewImage('EB')),
+              item('TIT', viewImage('TIT')),
+              ...(printVisible ? [item('GR', viewImage('GR'))] : []),
             ],
           },
           // {
@@ -1053,7 +1077,14 @@ export function BookMaster(props: ScreenProps) {
           //           [],
           //         );
           //     }),
-          //     item('Check For Image ', notOnWeb('Checking for images')),
+          //     // ViewImageSignToolStripMenuItem_Click: SN / EB / TIT for the row's LibNos that
+          //     // the scan / e-book / title folders have, added to the Info box.
+          //     item('Check For Image ', async () => {
+          //       const sign = state.fields.PM_GBKM_SEL_PLIST_IMG ?? '';
+          //       const r = await a.call('check-image', { current, sign }, []);
+          //       if (r?.kind === 'message' && r.message !== sign)
+          //         a.setField('PM_GBKM_SEL_PLIST_IMG', r.message);
+          //     }),
           //     item('Add/Edit MS Data', () => setMsData({ bookId: state.tranKm, state })),
           //     ...((state.fields.BookSubjTran ?? '').trim() !== ''
           //       ? [
@@ -1345,10 +1376,8 @@ export function BookMaster(props: ScreenProps) {
             const sampradayKt = Number(r?.code[0]) || 0;
             if (sampradayKt > 0) await a.run('update-kruti-seq', { sampradayKt }, []);
           }),
-          // item(
-          //   'ScanData Folder Info',
-          //   notOnWeb('ScanData Folder Info (\\\\192.168.0.210\\ScanData)'),
-          // ),
+          // The scan folder's top folders, as a book list in Excel.
+          item('ScanData Folder Info', run('scan-folder-info', undefined, [])),
         ],
       },
       // {
@@ -1429,10 +1458,11 @@ export function BookMaster(props: ScreenProps) {
                 ),
               ]
             : []),
-          // item(
-          //   'Full Card Portrait',
-          //   notOnWeb('Full Card Portrait (the "prakashan Card.xls" template)'),
-          // ),
+          // FullCardPortraitToolStripMenuItem_Click: the "prakashan Card.xls" cards, as a page.
+          item('Full Card Portrait', async () => {
+            const withParichayak = await a.confirm('Do You Want to Print Column No?');
+            await a.run('full-card-portrait', { withParichayak });
+          }),
           { kind: 'separator' },
           item('New Vishesh Report', async () => {
             const r = await pick('Head', namedList('heads-by-name'), true);

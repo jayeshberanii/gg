@@ -33,6 +33,7 @@ export function MasterGrid({
       apiRef={apiRef}
       rowTextColor={state.spec.rowTextColor}
       loading={!state.meta}
+      fillWidth
       onCurrentRowChange={(row) => {
         state.setCurrentRow(row);
         const id = row ? Number(row[pk]) : null;

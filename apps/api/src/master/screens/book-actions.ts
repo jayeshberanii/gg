@@ -1,6 +1,7 @@
 import type { ActionResult, GridRow, GridValue } from '@gglib/shared';
 import { BadRequestException } from '@nestjs/common';
 import { type RawBuilder, sql } from 'kysely';
+import { basename } from 'node:path';
 import { type Executor, idList, inTransaction } from '../../db/legacy-sql.js';
 import {
   bookReport,
@@ -9,7 +10,14 @@ import {
   visheshReport,
 } from '../../reports/book.js';
 import { prepareWorkReport, writeWorkReport } from '../work-report-log.js';
-import { ids, int, scalar, signBetween, table, text } from './book-common.js';
+import { ids, int, libNoList, scalar, signBetween, table, text } from './book-common.js';
+import {
+  findDirectories,
+  findFiles,
+  localRoot,
+  toDesktopPath,
+  windowsPattern,
+} from '../library-files.js';
 import type { ActionContext, ScreenDefinition } from './registry.js';
 import { masterGrid } from './master-common.js';
 
@@ -831,6 +839,124 @@ export const bookActions: Actions = {
       db,
     );
     return { kind: 'message', message: 'Restart Your Last Report Counter successfully !' };
+  },
+  /**
+   * View Image of This Book › SN / EB / TIT / GR (ViewImage → DisplayCurrImg): the .jpg / .tif /
+   * .pdf files of the book's first LibNo that has any in the type's folder (scanpath.txt's 1st
+   * to 4th), as the list the desktop picks a file to open from. SN and GR look in the folders
+   * named after the LibNo at the top of the share; EB and TIT anywhere under it, and at files
+   * named after it too. Nothing found: nothing happens (the desktop's message is commented out).
+   */
+  async 'view-image'(db, _user, _selected, ctx) {
+    const type = textParam(ctx, 'type').toUpperCase();
+    const root = ({ SN: 'scan', EB: 'ebook', TIT: 'title', GR: 'graphics' } as const)[type];
+    if (!root) throw new BadRequestException('Unknown image type');
+    const { rows } = await sql<{ Libno: string | null }>`
+      SELECT Libno FROM BookT WHERE BookMastkt = ${numberParam(ctx, 'current')}
+    `.execute(db);
+    const dir = localRoot(ctx.env, root);
+    const viewable = (name: string) => /\.(jpg|tif|pdf)$/i.test(name);
+    const topOnly = root === 'scan' || root === 'graphics';
+    for (const libNo of rows.map((r) => (r.Libno ?? '').trim()).filter(Boolean)) {
+      // "*" & LibNo & "*.*"
+      const match = windowsPattern(`*${libNo}*.*`);
+      const folders = await findDirectories(dir, { match, recursive: !topOnly });
+      const files = topOnly ? [] : (await findFiles(dir, { match })).filter((f) => viewable(f));
+      for (const folder of folders) files.push(...(await findFiles(folder, { match: viewable })));
+      if (files.length > 0) {
+        return {
+          kind: 'table',
+          title: 'List',
+          columns: ['FileName'],
+          rows: files.map((f) => [toDesktopPath(ctx.env, root, f)]),
+        };
+      }
+    }
+    return { kind: 'message', message: '' };
+  },
+  /**
+   * For Current Record › Utility › Check For Image (ViewImageSignToolStripMenuItem_Click): for
+   * each LibNo of the row (the grid's LibNo cell, BookM.txtBookTran), SN / EB / TIT when the
+   * scan / e-book / title folder has a folder or file named after it ("*" & LibNo & "*.*",
+   * anywhere under the folder); the signs are added to what the Info box holds (`sign`). SN
+   * needs more than one match (`> 1`), the other two one — as the desktop has it.
+   */
+  async 'check-image'(db, _user, _selected, ctx) {
+    const cell = await scalar(
+      db,
+      sql`SELECT txtBookTran FROM BookM WHERE BookMastkm = ${numberParam(ctx, 'current')}`,
+    );
+    const libNos = text(cell)
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const checks = [
+      ['scan', 'SN', 2],
+      ['ebook', 'EB', 1],
+      ['title', 'TIT', 1],
+    ] as const;
+    // One walk of each folder for all the LibNos: the names any of them matches.
+    const patterns = libNos.map((libNo) => windowsPattern(`*${libNo}*.*`));
+    const any = (name: string) => patterns.some((p) => p(name));
+    const found = new Map<string, { folders: string[]; files: string[] }>();
+    for (const [root] of checks) {
+      const dir = localRoot(ctx.env, root);
+      found.set(root, {
+        folders: (await findDirectories(dir, { match: any })).map((f) => basename(f)),
+        files: (await findFiles(dir, { match: any })).map((f) => basename(f)),
+      });
+    }
+    let res = '';
+    for (const match of patterns) {
+      for (const [root, sign, atLeast] of checks) {
+        const { folders, files } = found.get(root)!;
+        if (
+          files.filter((f) => match(f)).length >= atLeast ||
+          folders.filter((f) => match(f)).length >= atLeast
+        )
+          res = signBetween(res, sign);
+      }
+    }
+    const sign = textParam(ctx, 'sign');
+    return { kind: 'message', message: res === '' ? sign : signBetween(sign, res) };
+  },
+  /**
+   * ScanData Folder Info (ScanDataFolderInfoToolStripMenuItem_Click): the folders at the top of
+   * the scan folder (v3.4.3.1: the configured ScanPath, no longer \\192.168.0.210\ScanData); the
+   * first 7 characters of each name longer than 7 are a LibNo, and the books of those go to Excel.
+   */
+  async 'scan-folder-info'(db, _user, _selected, ctx) {
+    const folders = await findDirectories(localRoot(ctx.env, 'scan'), { recursive: false });
+    if (folders.length === 0) return { kind: 'message', message: 'Files Not Found' };
+    const libNos = folders
+      .map((f) => basename(f))
+      .filter((name) => name.length > 7)
+      .map((name) => name.slice(0, 7));
+    const t = await table(
+      db,
+      sql`SELECT BM.BookName, Bt.Libno, BM.Part, BM.PSamvatVK, BM.TotalPages, BM.txtPrakashak, BM.txtAuthor,
+          AvrutiMast.Avrutiname
+        FROM BookT BT INNER JOIN BookM BM ON BT.BookMastkt = BM.BookMastkm
+        LEFT JOIN AvrutiMast ON BM.Avrutikt = AvrutiMast.Avrutitid
+        WHERE Libno IN ${libNoList(libNos)}`,
+    );
+    return {
+      kind: 'table',
+      title: 'ScanData Folder Info',
+      columns: t.columns.length
+        ? t.columns
+        : [
+            'BookName',
+            'Libno',
+            'Part',
+            'PSamvatVK',
+            'TotalPages',
+            'txtPrakashak',
+            'txtAuthor',
+            'Avrutiname',
+          ],
+      rows: t.rows,
+    };
   },
   async 'report-table'(db) {
     return excel(

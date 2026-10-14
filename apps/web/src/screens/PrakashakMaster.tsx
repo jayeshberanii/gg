@@ -5,6 +5,7 @@ import { useState } from 'react';
 import type { ContextMenuItem } from '@/components/ui/ContextMenu';
 import { InputBox } from '@/components/ui/InputBox';
 import { PickListDialog, type PickResult } from '@/components/ui/PickListDialog';
+import { DisplayImagesDialog } from '@/features/master/DisplayImagesDialog';
 import { MasterScreen } from '@/features/master/MasterScreen';
 import { netString } from '@/features/master/transSummary';
 import type { FieldSpec, ScreenActions, ScreenSpec, TransSpec } from '@/features/master/types';
@@ -330,6 +331,7 @@ const spec: ScreenSpec = {
     c1('prakcontactTran', 'Contact', 178, tran('prakcontactTran')),
     c1('PrakMAddTran', 'Address', 218, tran('PrakMAddTran')),
     c1('SamvatTran', 'Samvat', 258, tran('SamvatTran')),
+    // Not on the desktop form (its txtFinanceKt is commented out); F2 lists PrakMFin.
     c1('FinanceKt', 'Finance', 298, { kt: true, nameColumn: 'FinanceName' }),
     c2('recordno', 'Record No', 18, { readOnly: true, noF2: true }),
     c2('PrakMgmalaTran', 'GMala', 58, tran('PrakMgmalaTran')),
@@ -352,7 +354,7 @@ const spec: ScreenSpec = {
     { header: 'PrakName', field: 'txtPrakName', width: 200 },
     { header: 'RecordNo', field: 'recordno', width: 80 },
     { header: 'vikramsmvt', field: 'vikramsmvt', width: 90 },
-    { header: 'Count', field: 'Count', width: 70 },
+    // { header: 'Count', field: 'Count', width: 70 },
     { header: 'Book Count', field: 'BookCount', width: 80 },
     { header: 'Author', field: 'txtAuthor', width: 120 },
     { header: 'Samuday', field: 'SamudayName', width: 80 },
@@ -360,11 +362,10 @@ const spec: ScreenSpec = {
     { header: 'Prakar', field: 'txtPrakarName', width: 80 },
     { header: 'SubPrakar', field: 'txtSubPrakarName', width: 80 },
     { header: 'Status', field: 'StatusName', width: 80 },
+    // Web-only column: the desktop grid has no Finance (GvMain ends at Status).
+    { header: 'Finance', field: 'FinanceName', width: 80 },
   ],
 };
-
-// const notOnWeb = (a: ScreenActions, what: string) => () =>
-//   void a.alert(`${what} needs the desktop computers and cannot run in the web app.`);
 
 export function PrakashakMaster(props: ScreenProps) {
   const [picking, setPicking] = useState<{
@@ -372,6 +373,8 @@ export function PrakashakMaster(props: ScreenProps) {
     onPick: (r: PickResult) => void;
   } | null>(null);
   const [asking, setAsking] = useState<((value: string) => void) | null>(null);
+  /** frmDisplayImages' lstFiles, while it is open. */
+  const [images, setImages] = useState<string[] | null>(null);
 
   function menu(a: ScreenActions, _state: MasterState): ContextMenuItem[] {
     const item = (label: string, onSelect: () => void, disabled = false): ContextMenuItem => ({
@@ -461,10 +464,13 @@ export function PrakashakMaster(props: ScreenProps) {
       //   setAsking(() => (value: string) => void a.run('print-contact', { range: value }, [])),
       // ),
       // dead('Reports Of Count'),
-      // item(
-      //   'Show Image of RefrenceT for Selected Record',
-      //   notOnWeb(a, 'The scanned reference images (on the desktop file share)'),
-      // ),
+      // frmDisplayImages over the references' scanned pages (ReferenceTPath).
+      item('Show Image of RefrenceT for Selected Record', async () => {
+        const r = await a.call('refrence-images');
+        if (r?.kind !== 'table') return;
+        if (r.message) await a.alert(r.message);
+        setImages(r.rows.map((row) => String(row[0] ?? '')));
+      }),
       // {
       //   kind: 'submenu',
       //   label: 'Filter',
@@ -495,6 +501,13 @@ export function PrakashakMaster(props: ScreenProps) {
             then(value);
           }}
           onCancel={() => setAsking(null)}
+        />
+      )}
+      {images && (
+        <DisplayImagesDialog
+          screen="prakashak-master"
+          files={images}
+          onClose={() => setImages(null)}
         />
       )}
     </>

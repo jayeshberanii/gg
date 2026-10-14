@@ -4,6 +4,7 @@ import { sql } from 'kysely';
 import type { Executor } from '../../db/legacy-sql.js';
 import { pickListOf } from '../values.js';
 import { bookActions } from './book-actions.js';
+import { bookCardActions } from './card-actions.js';
 import {
   asDesktopError,
   bit,
@@ -1029,7 +1030,7 @@ export const bookMaster: ScreenDefinition = {
     gmalas: list(sql`SELECT tid, vishesh FROM visheshmast WHERE remark = 'gmala' ORDER BY vishesh`),
   },
 
-  actions: bookActions,
+  actions: { ...bookActions, ...bookCardActions },
 };
 
 export { TRANS as BOOK_TRANS };

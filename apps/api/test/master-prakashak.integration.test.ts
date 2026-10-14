@@ -213,6 +213,26 @@ describe.skipIf(!hasDb)('Prakashak Master via the master engine (integration)', 
         .post(`${API}/action/update-finance`)
         .send({ ids: [id], params: { financeKt: fin } });
       expect(res.body.message).toBe('Finance Updated in Selected Records');
+
+      // The form's Finance box: shown with the record, kept by a save, cleared when blanked.
+      const record = (await h.user.get(`${API}/record/${id}`)).body as GridRow;
+      expect(record.FinanceKt).toBe(fin);
+      expect(String(record.FinanceName ?? '')).not.toBe('');
+      // …and in the grid's Finance column (gridColumnsAlso; tblSearch does not flag it).
+      const listed = (await h.user.post(`${API}/list`).send({ ids: [id] })).body as GridRow[];
+      expect(listed[0]!.FinanceName).toBe(record.FinanceName);
+      await save(id, { prakname: 'menu', PrakMRefLibNoTran: 'r', FinanceKt: String(fin) });
+      expect(
+        await h.scalar(
+          sql`SELECT ISNULL(FinanceKt, 0) AS n FROM prakmast WHERE prakcodekm = ${id}`,
+        ),
+      ).toBe(fin);
+      await save(id, { prakname: 'menu', PrakMRefLibNoTran: 'r', FinanceKt: '' });
+      expect(
+        await h.scalar(
+          sql`SELECT ISNULL(FinanceKt, 0) AS n FROM prakmast WHERE prakcodekm = ${id}`,
+        ),
+      ).toBe(0);
     }
     const dup = await h.user
       .post(`${API}/action/duplicate-recno`)
@@ -229,5 +249,27 @@ describe.skipIf(!hasDb)('Prakashak Master via the master engine (integration)', 
       ids: [],
       emptyMessage: 'No Author Available for Current Selection',
     });
+  });
+
+  it('prints the Samvat column of a prakashak that has samvat rows', async () => {
+    // tblSearch's own PrintColumn adds the int Vksamvat to the text and fails to convert.
+    const row = (
+      await sql<{ id: number; type: string | null; asamvat: string | null; vk: number | null }>`
+        SELECT TOP 1 s.PrakMastKt AS id, m.samvatname AS type, s.Asamvat AS asamvat, s.Vksamvat AS vk
+        FROM PrakMSamvatT s LEFT JOIN samvmast m ON m.samvatcokm = s.AsamvatKt
+        WHERE s.Vksamvat > 0 AND ISNULL(s.Asamvat, '') <> '' ORDER BY s.PrakMastKt, s.seq`.execute(
+        h.trx,
+      )
+    ).rows[0];
+    if (!row) return;
+    const meta = (await h.user.get(`${API}/meta`)).body;
+    const samvat = meta.printColumns.find((c: { name: string }) => c.name === 'Samvat');
+    expect(samvat).toBeDefined();
+    const printed = await h.user
+      .post(`${API}/print`)
+      .send({ ids: [Number(row.id)], columnIndices: [samvat.index] });
+    expect(printed.status).toBe(200);
+    expect(printed.body.rows).toHaveLength(1);
+    expect(String(printed.body.rows[0][0])).toContain(`${row.type ?? ''} ${row.asamvat} ${row.vk}`);
   });
 });

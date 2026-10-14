@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import { LIBRARY_DIR } from './e2e/helpers';
 
 const API_PORT = 8181;
 const WEB_PORT = 3100;
@@ -32,6 +33,7 @@ export default defineConfig({
         SECURITY_PASSWORD: 'e2e-security-pw',
         GRAPHICS_LOCK_PASSWORD: 'e2e-graphics-lock-pw',
         KRUTI_LOCK_PASSWORD: 'e2e-kruti-lock-pw',
+        LIBRARY_FILES_DIR: LIBRARY_DIR,
       },
       reuseExistingServer: false,
       timeout: 120_000,

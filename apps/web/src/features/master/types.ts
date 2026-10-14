@@ -414,6 +414,8 @@ export type GridColumnSpec = {
   header: string;
   field: string;
   width?: number;
+  /** DataGridViewColumn.MinimumWidth, where the Designer sets one (the WinForms default is 5). */
+  minWidth?: number;
   /** Visible = False: bound but not shown. */
   hidden?: boolean;
   /**
@@ -642,8 +644,9 @@ export type ScreenSpec = {
    */
   contextMenu?: (actions: ScreenActions) => ContextMenuItem[];
   /**
-   * The form passes its panel to EnableDisableDataEditing: every box is ReadOnly until Modify
-   * or New, and a popup opened then shows no New / Save / Delete / Move buttons.
+   * The form passes its panel to EnableDisableDataEditing: every TextBox is ReadOnly until
+   * Modify or New (no typing; an F2 list still fills the box), and a popup opened then shows no
+   * New / Save / Delete / Move buttons.
    */
   lockPanel?: boolean;
   /** The form's checks before "Are You Sure to Save This Record?"; '' when it may go on. */

@@ -5,7 +5,7 @@ import { UserType } from '@gglib/shared';
 import { useMemo, useRef, useState } from 'react';
 import type { ContextMenuItem } from '@/components/ui/ContextMenu';
 import { InputBox } from '@/components/ui/InputBox';
-import { ToolButton, ToolSeparator } from '@/components/ui/Modal';
+// import { ToolButton, ToolSeparator } from '@/components/ui/Modal';
 import { useMessageBox } from '@/components/ui/MessageBox';
 import { PickListDialog, type PickResult } from '@/components/ui/PickListDialog';
 import { useAuth } from '@/features/auth/AuthProvider';
@@ -858,7 +858,7 @@ export function KrutiMaster(props: ScreenProps) {
    * boolAskForAdminLockPassword: LockByAdmin asks its password only until one run got through.
    * The web keeps what was typed for the window and sends it again; the API checks it each time.
    */
-  const adminLockPassword = useRef<string | null>(null);
+  // const adminLockPassword = useRef<string | null>(null);
 
   const namedList = (name: string) => async () => {
     const cached = lists.current.get(name);
@@ -979,13 +979,13 @@ export function KrutiMaster(props: ScreenProps) {
     );
   }
 
-  /** btnAdminLock / btnAdminUnlock: LockByAdmin(True / False). */
-  async function lockByAdmin(a: ScreenActions, lock: boolean) {
-    if (!(await a.confirm(`Are You Sure To ${lock ? 'Lock' : 'Unlock'} Selected Records?`))) return;
-    const password = adminLockPassword.current ?? (await a.askPassword());
-    if (password === null) return;
-    if (await a.run('lock-by-admin', { lock, password })) adminLockPassword.current = password;
-  }
+  // /** btnAdminLock / btnAdminUnlock: LockByAdmin(True / False). */
+  // async function lockByAdmin(a: ScreenActions, lock: boolean) {
+  //   if (!(await a.confirm(`Are You Sure To ${lock ? 'Lock' : 'Unlock'} Selected Records?`))) return;
+  //   const password = adminLockPassword.current ?? (await a.askPassword());
+  //   if (password === null) return;
+  //   if (await a.run('lock-by-admin', { lock, password })) adminLockPassword.current = password;
+  // }
 
   const spec = useMemo(
     () =>
@@ -1192,8 +1192,12 @@ export function KrutiMaster(props: ScreenProps) {
             : item('Selected Column', a.printSelectedColumn),
           item('Missing Rec. Nos', run('missing-nos', { gridIds: a.gridIds }, [])),
           item('Duplicate Rec. Nos', run('duplicate-nos', { gridIds: a.gridIds }, [])),
-          // item('Full Card Landscape', notOnWeb('Full Card Landscape (the KrutiCard.xls template)')),
-          // item('Full Card Portrait', notOnWeb('Full Card Portrait (the KrutiCard.xls template)')),
+          // The KrutiCard.xls cards of every row the grid shows (dv.ToTable), as a page.
+          item('Full Card Landscape', run('full-card-landscape', { gridIds: a.gridIds }, [])),
+          item('Full Card Portrait', run('full-card-portrait', { gridIds: a.gridIds }, [])),
+          // Not ported, see docs/screens/kruti-master.md "Cards": KrutiFullCard.rpt is in neither
+          // the source nor the built EXE; Old Full Card reads columns its grid and queries do not
+          // have; Old Selected Card opens the column picker and prints nothing.
           // item('Crystal Report ', notOnWeb('Crystal Report (KrutiFullCard)')),
           // item('Old Full Card ', notOnWeb('Old Full Card (the "KrutiMater Card.xls" template)')),
           // item('Old Selected Card', notOnWeb('Old Selected Card')),
@@ -1256,10 +1260,14 @@ export function KrutiMaster(props: ScreenProps) {
                 const ids = (await krutisOf(s))?.code.join(',') ?? '';
                 await a.run('agam-suchi-index', { sampraday: s, ids }, []);
               }),
-              // item(
-              //   'Main Report As Agam Suchi New',
-              //   notOnWeb('Main Report As Agam Suchi New (Crystal Reports)'),
-              // ),
+              // The Crystal report KrutiAkaradiAgamSuchiReport: the same questions as Main.
+              item('Main Report As Agam Suchi New', async () => {
+                const s = code(await sampraday());
+                if (s <= 0) return;
+                const ids = (await krutisOf(s))?.code.join(',') ?? '';
+                const printAdiAnt = await a.confirm('Do yo Want to Print Adi/Ant Vakya?');
+                await a.run('agam-suchi-new', { sampraday: s, ids, printAdiAnt }, []);
+              }),
               item('Main Report With Reference', async () => {
                 const answer = await a.yesNoCancel(
                   'Press Yes To Select Akaradi From Grid Selection Records\r\nPress No To Select From List\r\nPress Cancel To Exit',
@@ -1627,26 +1635,26 @@ export function KrutiMaster(props: ScreenProps) {
         {...props}
         menu={menu}
         // AdminLockToolStrip (668, 304; 64x25): Visible for AMaster only (Form_Load).
-        inPanel={(a, _state, x) =>
-          user?.userType === UserType.AMaster ? (
-            <div
-              className="win-toolstrip absolute"
-              style={{ left: x(668), top: 304, width: 64, height: 25, backgroundColor: 'red' }}
-            >
-              <ToolButton
-                icon="lock"
-                label="Lock By Admin"
-                onClick={() => void lockByAdmin(a, true)}
-              />
-              <ToolSeparator />
-              <ToolButton
-                icon="lock-open"
-                label="Unlock By Admin"
-                onClick={() => void lockByAdmin(a, false)}
-              />
-            </div>
-          ) : null
-        }
+        // inPanel={(a, _state, x) =>
+        //   user?.userType === UserType.AMaster ? (
+        //     <div
+        //       className="win-toolstrip absolute"
+        //       style={{ left: x(668), top: 304, width: 64, height: 25, backgroundColor: 'red' }}
+        //     >
+        //       <ToolButton
+        //         icon="lock"
+        //         label="Lock By Admin"
+        //         onClick={() => void lockByAdmin(a, true)}
+        //       />
+        //       <ToolSeparator />
+        //       <ToolButton
+        //         icon="lock-open"
+        //         label="Unlock By Admin"
+        //         onClick={() => void lockByAdmin(a, false)}
+        //       />
+        //     </div>
+        //   ) : null
+        // }
         gridOverride={(a, state) =>
           tree ? (
             <KrutiTree

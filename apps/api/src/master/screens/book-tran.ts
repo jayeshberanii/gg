@@ -1,8 +1,10 @@
 import type { ActionResult, FieldValue, GridValue } from '@gglib/shared';
 import { BadRequestException } from '@nestjs/common';
 import { type RawBuilder, sql } from 'kysely';
+import { basename } from 'node:path';
 import { type Executor, idList, inTransaction } from '../../db/legacy-sql.js';
 import { ident } from '../../db/trusted-sql.js';
+import { findDirectories, findFiles, localRoot, windowsPattern } from '../library-files.js';
 import { writeWorkReport } from '../work-report-log.js';
 import { signFromLibNo, updateTxtBookTran } from './book-actions.js';
 import {
@@ -14,6 +16,7 @@ import {
   nextLibNo,
   type Row,
   scalar,
+  libNoList,
   signBetween,
   text,
   val,
@@ -280,6 +283,44 @@ const openWhere = async (
 
 const numberParam = (ctx: ActionContext, name: string) => int(ctx.params[name]);
 
+/** The mix signs UpdateSNEB / CheckNoUpdatedSNEBSign count as "has SN" and "has EB". */
+const PATH_SIGNS = {
+  SN: ['SN', 'SN(SC)', 'SN(Tif-clear)', 'SN(Tif-Not Clear)'],
+  EB: ['EB', 'EB (Doc-Original)', 'EB(o)', 'EB(O-Proof)'],
+} as const;
+type PathSign = keyof typeof PATH_SIGNS;
+
+function pathSignType(ctx: ActionContext): PathSign {
+  const type = text(ctx.params.type);
+  if (type !== 'SN' && type !== 'EB') throw new BadRequestException('Unknown sign');
+  return type;
+}
+
+/**
+ * The row has one of the type's mix signs. The desktop (v3.4.3.1) reads them from
+ * BookTranMixSignT, which this database does not have yet: until it does, they are the names
+ * between the commas of BookT.Mixsign (",SN,EB,"), where the Mixsign box keeps the same picks.
+ */
+function hasPathSign(type: PathSign): RawBuilder<unknown> {
+  const tests = PATH_SIGNS[type].map(
+    (sign) => sql`',' + ISNULL(BookT.Mixsign, '') + ',' LIKE ${`%,${sign},%`}`,
+  );
+  return sql`(${sql.join(tests, sql` OR `)})`;
+}
+
+/**
+ * The LibNos the folder has something for: the names (up to the first "_") of the folders at
+ * the top of the scan folder, or of the .pdf files anywhere under the e-book folder; names that
+ * start with the type itself ("SN…", "EB…") are left out.
+ */
+async function libNosInPath(ctx: ActionContext, type: PathSign): Promise<string[]> {
+  const paths =
+    type === 'SN'
+      ? await findDirectories(localRoot(ctx.env, 'scan'), { recursive: false })
+      : await findFiles(localRoot(ctx.env, 'ebook'), { match: windowsPattern('*.pdf') });
+  return paths.map((p) => basename(p).split('_')[0]!).filter((name) => !name.startsWith(type));
+}
+
 export const bookTran: ScreenDefinition = {
   screen: 'book-tran',
   accessScreen: 'book-master',
@@ -480,6 +521,56 @@ export const bookTran: ScreenDefinition = {
         ctx.env.LAB_ISSUE_OLD_DUE_BLOCK,
       );
       return { kind: 'message', message };
+    },
+    /**
+     * Utility › "Update SN / EB Not Exist In MixSign But Exist In Path" (UpdateSNEB): the BookT
+     * rows whose LibNo has a folder at the top of the scan folder (SN) or a .pdf anywhere under
+     * the e-book folder (EB) and no SN / EB mix sign. The desktop then asks: Yes sends the list
+     * to Excel, No (`update`) gives those rows the sign.
+     */
+    async 'mixsign-in-path'(db, _user, _selected, ctx) {
+      const type = pathSignType(ctx);
+      const inPath = await libNosInPath(ctx, type);
+      // An empty folder: the desktop fails on its empty list (Substring); nothing to show.
+      if (inPath.length === 0) return { kind: 'message', message: 'No Records Found' };
+      const missing = sql`Libno IN ${libNoList(inPath)} AND NOT ${hasPathSign(type)}`;
+      if (ctx.params.update !== true) {
+        const { rows } = await sql<{ Tid: number; LibNo: string | null }>`
+          SELECT Tid, LibNo FROM BookT WHERE ${missing} ORDER BY LibNo`.execute(db);
+        return {
+          kind: 'table',
+          title: 'frmBookTranNew',
+          // "Type & LIbNo" for SN, "[EB LIbNo]" for EB.
+          columns: ['Tid', type === 'SN' ? 'SNLIbNo' : 'EB LIbNo'],
+          rows: rows.map((r) => [Number(r.Tid), text(r.LibNo)]),
+          emptyMessage: 'No Records Found',
+        };
+      }
+      await sql`
+        UPDATE BookT SET Mixsign = CASE WHEN ISNULL(Mixsign, '') = '' THEN ${`,${type},`}
+          WHEN RIGHT(Mixsign, 1) = ',' THEN Mixsign + ${`${type},`} ELSE Mixsign + ${`,${type},`} END
+        WHERE ${missing}`.execute(db);
+      return { kind: 'message', message: 'Records Added Successfully' };
+    },
+    /**
+     * Utility › "Update SN Exist In MixSign But Not Exist In Path" and the second "Update EB Not
+     * Exist In MixSign But Exist In Path" (CheckNoUpdatedSNEBSign): the rows that carry an SN /
+     * EB mix sign and have nothing in the folder, to Excel. Despite the captions nothing is
+     * updated, and both lists are headed "SN LIbNo".
+     */
+    async 'mixsign-not-in-path'(db, _user, _selected, ctx) {
+      const type = pathSignType(ctx);
+      const list = libNoList(await libNosInPath(ctx, type));
+      const { rows } = await sql<{ BookTKt: number; Libno: string | null }>`
+        SELECT tid AS BookTKt, Libno FROM BookT
+        WHERE Libno NOT LIKE ${`${type}%`} AND ${hasPathSign(type)}
+          AND tid NOT IN (SELECT T.tid FROM BookT T WHERE T.Libno IN ${list})`.execute(db);
+      return {
+        kind: 'table',
+        title: 'frmBookTranNew',
+        columns: ['BookTKt', 'SN LIbNo'],
+        rows: rows.map((r) => [Number(r.BookTKt), text(r.Libno)]),
+      };
     },
     async 'send-book-confirmation'(db, user, selected, ctx) {
       const { rows } = await sql<{ Libno: string }>`

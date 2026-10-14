@@ -1,7 +1,15 @@
 import { expect, type Page, test } from '@playwright/test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 /** Shared helpers for the browser tests. The API is apps/api/test/e2e-server.mjs. */
 export const API = 'http://localhost:8181';
+
+/**
+ * The e2e API's copy of the desktop's file folders (LIBRARY_FILES_DIR): ScanData, B2 Ebook …
+ * under it stand for \\192.168.0.50\ScanData and the rest. Specs write their files here.
+ */
+export const LIBRARY_DIR = join(tmpdir(), 'gglib-e2e-library');
 
 export type Scenario = {
   users: Record<

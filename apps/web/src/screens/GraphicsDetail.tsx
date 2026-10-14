@@ -1,13 +1,17 @@
 'use client';
 
-import type { ChildRow, GridRow, PickList, TransTable } from '@gglib/shared';
+import type { ChildRow, GridRow, GridValue, PickList, TransTable } from '@gglib/shared';
 import { useEffect, useState } from 'react';
-import type { ContextMenuItem } from '@/components/ui/ContextMenu';
+import { ContextMenu, type ContextMenuItem } from '@/components/ui/ContextMenu';
+import { useMessageBox } from '@/components/ui/MessageBox';
 import type { PickResult } from '@/components/ui/PickListDialog';
+import { PopupTableDialog } from '@/components/ui/PopupTableDialog';
 import { copyWithNewKeys } from '@/features/master/commonTrans';
 import { DataGrid } from '@/features/master/DataGrid';
-import { desktopOnlyMessage } from '@/features/master/desktopOnly';
 import { DisplayTransDialog } from '@/features/master/DisplayTransDialog';
+import { LibraryFileDialog } from '@/features/master/LibraryFileDialog';
+import { useImageViewer } from '@/features/master/ImageViewer';
+import { libraryFileUrl } from '@/features/master/libraryFiles';
 import { MasterScreen } from '@/features/master/MasterScreen';
 import { netString } from '@/features/master/transSummary';
 import type {
@@ -20,6 +24,8 @@ import type {
 } from '@/features/master/types';
 import type { MasterState } from '@/features/master/useMasterScreen';
 import { todayIso } from '@/lib/format';
+import { GraphicsFolderDialog } from './GraphicsFolderDialog';
+import { type GraphicsPicture, GraphicsPicturesDialog, toPictures } from './GraphicsPicturesDialog';
 import { getVirSamvat } from './GraphicsMaster';
 import type { ScreenProps } from './registry';
 
@@ -124,7 +130,7 @@ const TRANS: Record<string, TransSpec> = {
   StyleTran: wordTrans('StyleTran', 'Style'),
   AvailableAtTran: wordTrans('AvailableAtTran', 'AvailableAt'),
   // TranName "Grdetail": {Id, 0, 0, "", "", "", "", Rows.Count + 1}, started in BookTName. The
-  // filepath cell's OpenFileDialog is typed text here (files are deferred).
+  // filepath cell's OpenFileDialog is typed text here.
   GrdetailOtherRefTran: {
     column: 'GrdetailOtherRefTran',
     hidden: ['GrdetailOtherRefTKm', 'graphicbkt', 'BookTKt'],
@@ -283,6 +289,18 @@ async function updatePatrika(a: ScreenActions) {
 
 type Grouping = { group: number; remarks: string; ids: number[]; table: TransTable };
 
+/** The screen's own dialogs for the pictures (see `Ui`). */
+type Dialog =
+  | { kind: 'pictures'; a: ScreenActions; pictures: GraphicsPicture[]; title?: string }
+  | {
+      kind: 'browse';
+      a: ScreenActions;
+      mode: 'file' | 'folder';
+      start: string;
+      resolve: (path: string | null) => void;
+    }
+  | { kind: 'table'; table: TableResult };
+
 /** Utility › insert into grouping records, up to its popup (the Save is the popup's). */
 async function startGrouping(a: ScreenActions, open: (g: Grouping) => void) {
   const ids = a.selectedIds;
@@ -299,15 +317,220 @@ async function startGrouping(a: ScreenActions, open: (g: Grouping) => void) {
   open({ group, remarks, ids, table: { columns: GROUPING_COLUMNS, rows } });
 }
 
-const desktopOnly = (a: ScreenActions, what: string) => () =>
-  void a.alert(desktopOnlyMessage(what));
+// ------------------------------------------------------------------------------------------
+// The pictures (graphicbkt.filepath, on the server's copies of the desktop's folders)
+// ------------------------------------------------------------------------------------------
+
+type TableResult = { title: string; columns: string[]; rows: GridValue[][] };
+
+/** The dialogs the menu items open, beside the engine's own (message boxes, pick lists). */
+type Ui = {
+  openGrouping: (g: Grouping) => void;
+  /** Process.Start(path): the image viewer over the files, at `index`; resolves when closed. */
+  view: (files: string[], index?: number, captions?: string[]) => Promise<void>;
+  /** FormDisplayImage. */
+  pictures: (a: ScreenActions, pictures: GraphicsPicture[], title?: string) => void;
+  /**
+   * OpenFileDialog1 ("file", starting at `start`'s folder) / FolderBrowserDialog1 ("folder") over
+   * the server's folders: the pick, or null.
+   */
+  browse: (a: ScreenActions, mode: 'file' | 'folder', start?: string) => Promise<string | null>;
+  /** A computed table, in the popup grid. */
+  table: (table: TableResult) => void;
+  /** InputBox(prompt, title, default). */
+  input: (prompt: string, title?: string, initial?: string) => Promise<string | null>;
+};
+
+/** Substring(InStrRev(path, "\")): the file name. */
+const fileNameOf = (path: string) => path.slice(path.lastIndexOf('\\') + 1);
+
+const asTable = (r: Awaited<ReturnType<ScreenActions['call']>>): TableResult | null =>
+  r?.kind === 'table' ? { title: r.title, columns: r.columns, rows: r.rows } : null;
+
+/** Show Pictures: FormDisplayImage over the selected rows that have a File Path. */
+async function showPictures(a: ScreenActions, ui: Ui) {
+  const t = asTable(await a.call('show-pictures'));
+  if (t) ui.pictures(a, toPictures(t.rows));
+}
+
+/**
+ * Copy to TempGr And Open with Acdsee - Selected Record: the copies (`<Id>.jpg` in the user's
+ * folder under d:\tempgr) in the picture viewer, where the desktop started ACDSee on the last one.
+ */
+async function copyToTempGr(a: ScreenActions, ui: Ui) {
+  const t = asTable(await a.call('copy-to-tempgr'));
+  if (t && t.rows.length > 0) ui.pictures(a, toPictures(t.rows), t.title);
+}
+
+/** Print Record › Showing Mismatch Of No Of Images: FolderBrowserDialog1, then the counts. */
+async function imageCountMismatch(a: ScreenActions, ui: Ui) {
+  const folder = await ui.browse(a, 'folder');
+  if (folder === null) return;
+  const t = asTable(await a.call('image-count-mismatch', { folder }, []));
+  if (t) ui.table(t);
+}
+
+/** Utility › Update Blank Filepath For Given Book: the Yes/No, then the Security password. */
+async function updateBlankFilepath(a: ScreenActions, state: MasterState) {
+  const sure = await a.confirm(
+    'You are About to update the blank file path Are You Sure ?  ',
+    'Conformation',
+  );
+  if (!sure) return;
+  const password = await a.askPassword();
+  if (password === null) return;
+  await a.run('update-blank-filepath', {
+    graphickt: a.tags.Graphickt ?? 0,
+    libNo: state.fields.Graphickt ?? '',
+    password,
+  });
+}
+
+/**
+ * Utility › Send Image To Folder: FolderBrowserDialog1, the prefix (today as d + M + yyyy to
+ * start with), then the copies as a list to open, as View Image's. Cancel in either stops here;
+ * the desktop went on with an empty folder or prefix.
+ */
+async function sendImageToFolder(a: ScreenActions, ui: Ui) {
+  if (a.selectedIds.length === 0) return;
+  const folder = await ui.browse(a, 'folder');
+  if (folder === null) return;
+  const [year, month, day] = todayIso().split('-');
+  const prefix = await ui.input(
+    'any other prefix string to be added in filename Pleas Add Data Purpose person',
+    'Prefix Add',
+    `${Number(day)}${Number(month)}${year}`,
+  );
+  if (prefix === null) return;
+  const copies = asList(await a.call('send-image-to-folder', { folder, prefix }));
+  if (!copies || copies.rows.length === 0) return;
+  const files = copies.rows.map((r) => netString(r[0] ?? null));
+  for (;;) {
+    const picked = await a.pick(copies, { title: 'List' });
+    const path = picked?.code[0] ?? '';
+    if (path === '') return;
+    await ui.view(files, Math.max(0, files.indexOf(path)));
+  }
+}
+
+/** Utility › Rename File Name Records: the current row's file, on disk too (Yes) or not (No). */
+async function renameFile(a: ScreenActions) {
+  if (a.currentId === null) return;
+  const path = netString(a.currentRow?.filepath ?? null);
+  if (path === '') {
+    await a.alert('No Files Found');
+    return;
+  }
+  const physical = await a.confirm(
+    'Press(Yes) to Rename both Physical FileName and FilePath Record\r\nPress(No) to Rename Only FilePath Record',
+  );
+  const name = await a.input('Enter New File Name', fileNameOf(path));
+  if (name === null || name === '') return;
+  await a.run('rename-file', { current: a.currentId, name, physical }, [a.currentId]);
+}
+
+/** Select Picture (ContextMenuStrip1): OpenFileDialog1's file becomes the record's FilePath. */
+async function selectPicture(a: ScreenActions, state: MasterState, ui: Ui) {
+  const path = await ui.browse(a, 'file', state.fields.filepath ?? '');
+  if (path !== null) a.setField('filepath', path);
+}
+
+/**
+ * PicImage's click: the image viewer over all the pictures of the record's Graphics Master
+ * record (RecNo order), at this record's, so Previous / Next Page go through that book's
+ * pictures. The picture shown is the box's own (an unsaved Select Picture too), with only
+ * itself when the record has no saved master pictures to go with.
+ */
+async function viewMasterPictures(a: ScreenActions, path: string, ui: Ui) {
+  const r =
+    a.currentId === null ? null : await a.call('master-pictures', { current: a.currentId }, []);
+  const rows = r?.kind === 'table' ? r.rows : [];
+  const at = rows.findIndex((row) => Number(row[0]) === a.currentId);
+  if (at < 0) {
+    await ui.view([path]);
+    return;
+  }
+  const files = rows.map((row) => netString(row[1] ?? null));
+  // The box shows what the form holds, which may be a picture picked but not saved yet.
+  files[at] = path;
+  const captions = rows.map((row) =>
+    [
+      row[2] !== null && row[2] !== undefined ? `RecNo ${netString(row[2])}` : '',
+      netString(row[3] ?? null).trim() !== '' ? `RefPlace ${netString(row[3] ?? null).trim()}` : '',
+    ]
+      .filter(Boolean)
+      .join(', '),
+  );
+  await ui.view(files, at, captions);
+}
+
+/** ContextMenuStrip1's first two items (PicImage's whole menu). */
+const pictureItems = (a: ScreenActions, state: MasterState, ui: Ui): ContextMenuItem[] => [
+  { kind: 'item', label: 'Select Picture', onSelect: () => void selectPicture(a, state, ui) },
+  // Remove Picture: FilePath = "" (saved with the record's next Save).
+  { kind: 'item', label: 'Remove Picture', onSelect: () => a.setField('filepath', '') },
+];
+
+/**
+ * PicImage (796,30, 203 x 213, FixedSingle, StretchImage): the record's picture when its file
+ * exists, a click opens it (Process.Start(FilePath): the image viewer); right-click: Select / Remove Picture.
+ */
+function PictureBox({
+  a,
+  state,
+  x,
+  ui,
+}: {
+  a: ScreenActions;
+  state: MasterState;
+  x: (v: number) => number;
+  ui: Ui;
+}) {
+  const [menuAt, setMenuAt] = useState<{ x: number; y: number } | null>(null);
+  const path = state.fields.filepath ?? '';
+  return (
+    <>
+      <button
+        type="button"
+        aria-label="Picture"
+        title={path}
+        className="absolute border border-black bg-transparent p-0"
+        style={{ left: x(796), top: 30, width: x(796 + 203) - x(796), height: 213 }}
+        onClick={() => {
+          if (path !== '') void viewMasterPictures(a, path, ui);
+        }}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          setMenuAt({ x: e.clientX, y: e.clientY });
+        }}
+      >
+        {path !== '' && (
+          <img
+            key={path}
+            src={libraryFileUrl('graphics-detail', path)}
+            alt=""
+            style={{ width: '100%', height: '100%', objectFit: 'fill' }}
+            // File.Exists(FilePath) = False: the box stays empty.
+            onError={(e) => {
+              e.currentTarget.style.visibility = 'hidden';
+            }}
+          />
+        )}
+      </button>
+      {menuAt && (
+        <ContextMenu
+          at={menuAt}
+          label="Picture"
+          items={pictureItems(a, state, ui)}
+          onClose={() => setMenuAt(null)}
+        />
+      )}
+    </>
+  );
+}
 
 /** cntGrid, item for item. */
-function menu(
-  a: ScreenActions,
-  state: MasterState,
-  openGrouping: (g: Grouping) => void,
-): ContextMenuItem[] {
+function menu(a: ScreenActions, state: MasterState, ui: Ui): ContextMenuItem[] {
   // FillData: a Locked record turns Replace / Insert / Delete in Selected Record off.
   const off = state.locked;
   const bulkItems = (run: (type: string) => void): ContextMenuItem[] =>
@@ -318,7 +541,7 @@ function menu(
       onSelect: () => run(type),
     }));
   return [
-    { kind: 'item', label: 'Show Pictures', onSelect: desktopOnly(a, 'Show Pictures') },
+    { kind: 'item', label: 'Show Pictures', onSelect: () => void showPictures(a, ui) },
     {
       kind: 'submenu',
       label: 'Show Record From Selected Record',
@@ -326,7 +549,7 @@ function menu(
         {
           kind: 'item',
           label: "File Not Found on it's Original Location",
-          onSelect: desktopOnly(a, 'File Not Found on its Original Location'),
+          onSelect: () => void a.run('file-not-found'),
         },
         {
           kind: 'item',
@@ -341,14 +564,16 @@ function menu(
         {
           kind: 'item',
           label: '-XXX Deleted Picture',
-          onSelect: desktopOnly(a, '-XXX Deleted Picture'),
+          onSelect: () => {
+            if (a.currentId !== null) void a.run('deleted-picture', { current: a.currentId }, []);
+          },
         },
       ],
     },
     {
       kind: 'item',
       label: 'Copy to TempGr And Open with Acdsee - Selected Record',
-      onSelect: desktopOnly(a, 'Copy to TempGr And Open with Acdsee'),
+      onSelect: () => void copyToTempGr(a, ui),
     },
     {
       kind: 'submenu',
@@ -371,11 +596,11 @@ function menu(
               onSelect: a.printSelectedColumn,
             }
           : { kind: 'item', label: 'Selected Column', onSelect: a.printSelectedColumn },
-        // {
-        //   kind: 'item',
-        //   label: 'Showing Mismatch Of No Of Images',
-        //   onSelect: desktopOnly(a, 'Showing Mismatch Of No Of Images'),
-        // },
+        {
+          kind: 'item',
+          label: 'Showing Mismatch Of No Of Images',
+          onSelect: () => void imageCountMismatch(a, ui),
+        },
         { kind: 'item', label: 'Send to Excel', onSelect: a.sendToExcel },
         // {
         //   kind: 'item',
@@ -410,32 +635,34 @@ function menu(
         {
           kind: 'item',
           label: 'Show File Not Linked for Give Book',
-          onSelect: desktopOnly(a, 'Show File Not Linked for Give Book'),
+          onSelect: () => {
+            if (a.currentId !== null) void a.run('not-linked-files', { current: a.currentId }, []);
+          },
         },
         {
           kind: 'item',
           label: 'Update Blank Filepath For Given Book',
-          onSelect: desktopOnly(a, 'Update Blank Filepath For Given Book'),
+          onSelect: () => void updateBlankFilepath(a, state),
         },
         {
           kind: 'item',
           label: 'Send Image To Folder',
-          onSelect: desktopOnly(a, 'Send Image To Folder'),
+          onSelect: () => void sendImageToFolder(a, ui),
         },
         {
           kind: 'item',
           label: 'Rename File Name Records',
-          onSelect: desktopOnly(a, 'Rename File Name Records'),
+          onSelect: () => void renameFile(a),
         },
         {
           kind: 'item',
           label: 'Rename File Name With Refpls for selected Reords',
-          onSelect: desktopOnly(a, 'Rename File Name With Refpls'),
+          onSelect: () => void a.run('rename-with-refplace'),
         },
         {
           kind: 'item',
           label: 'insert into grouping records',
-          onSelect: () => void startGrouping(a, openGrouping),
+          onSelect: () => void startGrouping(a, ui.openGrouping),
         },
         { kind: 'item', label: 'Break And Bind', onSelect: () => void breakAndBind(a) },
         {
@@ -490,10 +717,12 @@ function ParentGrid({
   a,
   state,
   initial,
+  ui,
 }: {
   a: ScreenActions;
   state: MasterState;
   initial: number;
+  ui: Ui;
 }) {
   const [parentId, setParentId] = useState(initial);
   const [rows, setRows] = useState<GridRow[]>([]);
@@ -515,9 +744,7 @@ function ParentGrid({
     });
   }, [parentId, state.loaded]);
   const items: ContextMenuItem[] = [
-    // { kind: 'item', label: 'Select Picture', onSelect: desktopOnly(a, 'Select Picture') },
-    // // Remove Picture: FilePath = "" (saved with the record's next Save).
-    // { kind: 'item', label: 'Remove Picture', onSelect: () => a.setField('filepath', '') },
+    ...pictureItems(a, state, ui),
     {
       kind: 'submenu',
       label: 'Utility',
@@ -572,8 +799,6 @@ const spec: ScreenSpec = {
     { text: 'Remark', at: { x: 13, y: 262 } },
     { text: 'comment', at: { x: 287, y: 262 } },
     { text: 'Other LibNo', at: { x: 525, y: 262 } },
-    // PicImage (796,30): the picture's path, typed (the picture itself needs the desktop).
-    { text: 'File Path', at: { x: 796, y: 6 }, sizePt: 9 },
   ],
   fields: [
     box('Graphickt', [121, 20, 158], kt('LibNo')),
@@ -598,7 +823,8 @@ const spec: ScreenSpec = {
     box('remark', [121, 258, 158]),
     box('comment', [410, 258, 109]),
     box('GrdetailOtherRefTran', [661, 258, 124], { trans: 'GrdetailOtherRefTran' }),
-    box('filepath', [796, 30, 203], { noF2: true, h: 87 }),
+    // The form's FilePath variable: PicImage shows it (PictureBox, below), Save writes it.
+    box('filepath', [796, 30, 203], { hidden: true }),
     box('pending', [796, 261, 89], { checkbox: 'Pending' }),
   ],
   trans: TRANS,
@@ -658,25 +884,37 @@ const spec: ScreenSpec = {
 
 /**
  * Graphics › Graphics Detail (frmGraphicsDetail). Positions, widths and headers are
- * frmGraphicsDetail.Designer.vb's. The picture box is a File Path text box (files are deferred).
- * See docs/screens/graphics-detail.md.
+ * frmGraphicsDetail.Designer.vb's. The pictures are the server's copies of the desktop's folders
+ * (features/master/libraryFiles.ts). See docs/screens/graphics-detail.md.
  */
 export function GraphicsDetail(props: ScreenProps) {
+  const msg = useMessageBox();
+  const viewer = useImageViewer();
   const [grouping, setGrouping] = useState<Grouping | null>(null);
   const [runGroupingSave, setRunGroupingSave] = useState<ScreenActions | null>(null);
+  const [dialog, setDialog] = useState<Dialog | null>(null);
   const initial = Number(props.initialNew?.Graphickt) || 0;
+  const uiFor = (a: ScreenActions): Ui => ({
+    view: (files, index, captions) => viewer.open({ screen: spec.screen, files, index, captions }),
+    openGrouping: (g) => {
+      setRunGroupingSave(a);
+      setGrouping(g);
+    },
+    pictures: (actions, pictures, title) =>
+      setDialog({ kind: 'pictures', a: actions, pictures, title }),
+    browse: (actions, mode, start = '') =>
+      new Promise((resolve) => setDialog({ kind: 'browse', a: actions, mode, start, resolve })),
+    table: (table) => setDialog({ kind: 'table', table }),
+    input: msg.input,
+  });
   return (
     <>
       <MasterScreen
         spec={spec}
         {...props}
-        menu={(a, state) => {
-          return menu(a, state, (g) => {
-            setRunGroupingSave(a);
-            setGrouping(g);
-          });
-        }}
-        aboveGrid={(a, state) => <ParentGrid a={a} state={state} initial={initial} />}
+        menu={(a, state) => menu(a, state, uiFor(a))}
+        aboveGrid={(a, state) => <ParentGrid a={a} state={state} initial={initial} ui={uiFor(a)} />}
+        inPanel={(a, state, x) => <PictureBox a={a} state={state} x={x} ui={uiFor(a)} />}
       />
       {grouping && runGroupingSave && (
         <DisplayTransDialog
@@ -693,6 +931,60 @@ export function GraphicsDetail(props: ScreenProps) {
               g.ids,
             );
           }}
+        />
+      )}
+      {dialog?.kind === 'pictures' && (
+        <GraphicsPicturesDialog
+          screen={spec.screen}
+          title={dialog.title}
+          pictures={dialog.pictures}
+          onClose={() => setDialog(null)}
+          // InputBox("Please Enter Temp Selected"), then the ticked pictures' records.
+          onSaveTempSelected={(ids) => {
+            void (async () => {
+              const name = await msg.input('Please Enter Temp Selected');
+              if (name !== null && name !== '')
+                await dialog.a.run('save-temp-selected', { name }, ids);
+            })();
+          }}
+        />
+      )}
+      {dialog?.kind === 'browse' && dialog.mode === 'file' && (
+        <LibraryFileDialog
+          screen={spec.screen}
+          initialPath={dialog.start}
+          onPick={(path) => {
+            setDialog(null);
+            dialog.resolve(path);
+          }}
+          onCancel={() => {
+            setDialog(null);
+            dialog.resolve(null);
+          }}
+        />
+      )}
+      {dialog?.kind === 'browse' && dialog.mode === 'folder' && (
+        <GraphicsFolderDialog
+          screen={spec.screen}
+          makeFolder={async (path, name) =>
+            (await dialog.a.call('make-folder', { path, name }, [])) !== null
+          }
+          onPick={(path) => {
+            setDialog(null);
+            dialog.resolve(path);
+          }}
+          onCancel={() => {
+            setDialog(null);
+            dialog.resolve(null);
+          }}
+        />
+      )}
+      {dialog?.kind === 'table' && (
+        <PopupTableDialog
+          title={dialog.table.title}
+          columns={dialog.table.columns}
+          rows={dialog.table.rows}
+          onClose={() => setDialog(null)}
         />
       )}
     </>

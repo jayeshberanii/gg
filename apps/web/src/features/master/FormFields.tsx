@@ -73,6 +73,7 @@ function useHorizontalScale(designWidth: number) {
  * panel's width, while heights, rows and fonts stay as designed. F2
  * opens the box's list (Txt_KeyDown) or, on a "…Tran" box, its popup; F1 its reference rows;
  * Ctrl +/- changes the font size; the box with the focus turns WhiteSmoke (Txt_Enter/Leave).
+ * F3 opens the box's text in frmBixtextbox: that is BigTextHost's, for every `.win-textbox`.
  */
 export function FormFields({
   state,
@@ -116,7 +117,11 @@ export function FormFields({
   const isAdmin = auth.status === 'authenticated' && auth.user.isAdmin;
   const editableForUser = (f: FieldSpec) =>
     !f.editableFor || (auth.status === 'authenticated' && f.editableFor(auth.user));
-  /** makeTextBoxesReadOnly: with lockPanel, every box is ReadOnly until New or Modify. */
+  /**
+   * makeTextBoxesReadOnly: with lockPanel, every TextBox is ReadOnly until New or Modify. That
+   * stops typing only: F2 still opens the box's list and DisplayListForm puts the pick in it,
+   * and the panel's other controls (DateTimePicker, ComboBox, CheckBox) are left as they are.
+   */
   const panelReadOnly = Boolean(spec.lockPanel) && state.mode !== 'edit';
   /** FieldSpec.readOnlyWhen / disabledWhen: the box's state for the form as it is now. */
   const readOnlyNow = (f: FieldSpec) => Boolean(f.readOnly || f.readOnlyWhen?.(ctx));
@@ -247,7 +252,7 @@ export function FormFields({
       else if (f.vishayEntry) void openVishayEntry(f, f.vishayEntry);
       else if (f.trans) void openTrans(f, f.trans);
       else if (f.transList) void openTransList(f, f.transList);
-      else if (!readOnlyNow(f) && !panelReadOnly) void openPickList(f);
+      else if (!readOnlyNow(f)) void openPickList(f);
     } else if (e.key === 'F1' && spec.help) {
       e.preventDefault();
       void openHelp(f);
@@ -357,7 +362,7 @@ export function FormFields({
                 type="date"
                 aria-label={f.label ?? f.name}
                 value={state.fields[f.name] || todayIso()}
-                disabled={disabledNow(f) || !editableForUser(f) || panelReadOnly}
+                disabled={disabledNow(f) || !editableForUser(f)}
                 // A DateTimePicker always holds a date: clearing it leaves the date it had.
                 onChange={(e) => {
                   if (!e.target.value) return;
@@ -378,7 +383,7 @@ export function FormFields({
                 id={`fld-${f.name}`}
                 aria-label={f.label ?? f.name}
                 value={state.fields[f.name] ?? ''}
-                disabled={disabledNow(f) || !editableForUser(f) || panelReadOnly}
+                disabled={disabledNow(f) || !editableForUser(f)}
                 onChange={(e) => {
                   state.setField(f.name, e.target.value);
                   f.onUserChange?.(e.target.value, ctx);
@@ -407,13 +412,18 @@ export function FormFields({
                   value: state.fields[f.name] ?? '',
                   disabled: disabledNow(f) || !editableForUser(f),
                   readOnly,
-                  title: readOnly
+                  title: readOnlyNow(f)
                     ? undefined
                     : f.kt || f.trans || f.vishayEntry
                       ? 'F2 to choose'
                       : undefined,
                   ...(f.mask
-                    ? { maxLength: f.mask.length, placeholder: f.mask.replace(/[09]/g, '_') }
+                    ? {
+                        maxLength: f.mask.length,
+                        placeholder: f.mask.replace(/[09]/g, '_'),
+                        // A MaskedTextBox: SetControl gives it no F3 (BigTextHost).
+                        'data-bigtext': 'off',
+                      }
                     : {}),
                   className: 'win-textbox absolute focus:bg-[#f5f5f5]',
                   style: {

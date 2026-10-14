@@ -39,6 +39,18 @@ and conditions. Row order is the procedure's own.
 | Kruti › परिशिष्ट 9                                               | `Home/KrutiPrakashakReport`         | `krutiPrakashakReport`                | `PrintKrutiPrakashakReport`                                            |
 | Tirth Raksha › Print Report › Main Report                        | `Home/PrintTirthRakshaReport`       | `tirth-raksha.ts` `tirthRakshaReport` | `PrintTirthRakshaReport`, records from `TranIds`                       |
 
+Three more report pages do not come from the site; they stand in for the desktop's Excel cards
+and one Crystal report, and use the same `ReportDocument` and viewer:
+
+| Menu item                                           | Desktop output                            | Builder                                    | Data                                                         |
+| --------------------------------------------------- | ----------------------------------------- | ------------------------------------------ | ------------------------------------------------------------ |
+| Kruti › Print Report › Full Card Portrait/Landscape | `KrutiCard.xls` filled cell by cell       | `kruti-cards.ts` `krutiFullCardPortrait/…` | the record's tblSearch columns + its note / up-level queries |
+| Kruti › Main Report As Agam Suchi New               | Crystal `KrutiAkaradiAgamSuchiReport.rpt` | `krutiAgamSuchiNewReport` (provisional)    | `PrintKrutiAkaradiAgamSuchiCrystalReport`, krutis in TranIds |
+| Book › Print › Full Card Portrait                   | `prakashan Card.xls` filled cell by cell  | `book-cards.ts` `bookFullCardPortrait`     | the handler's two queries                                    |
+
+See `kruti-master.md` and `book-master.md`, "Cards", for the cell maps, what is unknown (the
+templates and the `.rpt` are not readable) and the items that stay unported.
+
 Not ported: `Home/Index` (a hard-coded test of PrintVishesh whose view no longer compiles) and
 `Common/*` (stubs). The `/Coding` pages (Vishay Kosh, Charts) read a second database,
 `DBCoding`; they are a later phase.

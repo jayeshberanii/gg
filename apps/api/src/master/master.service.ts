@@ -1081,7 +1081,11 @@ export class MasterService {
     user?: SessionUser,
   ): Promise<PrintResult> {
     const def = this.definition(screen);
-    const all = printColumns(await loadTblSearch(db, def.table), isSecret(def.secretColumns));
+    const printable = (await loadTblSearch(db, def.table)).map((r) => {
+      const override = def.printOverrides?.[(r.ColumnName ?? '').toLowerCase()];
+      return override && r.PrintColumn ? { ...r, PrintColumn: override } : r;
+    });
+    const all = printColumns(printable, isSecret(def.secretColumns));
 
     let indices = req.columnIndices;
     let title = 'Selected Column';

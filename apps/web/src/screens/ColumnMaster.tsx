@@ -103,6 +103,8 @@ function menu(a: ScreenActions): ContextMenuItem[] {
               onSelect: a.printSelectedColumn,
             }
           : { kind: 'item', label: 'Print Selected Column', onSelect: a.printSelectedColumn },
+        // Not ported: ColumnReport.rpt is Crystal-encrypted, so neither its fields nor its layout
+        // can be read (docs/screens/column-master.md).
         // {
         //   kind: 'item',
         //   label: 'Print Selected Record',

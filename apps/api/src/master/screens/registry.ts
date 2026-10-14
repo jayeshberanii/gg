@@ -353,6 +353,11 @@ export type ScreenDefinition = {
     }
   >;
   /**
+   * "Print Report › Selected Column" expressions used instead of tblSearch's PrintColumn, keyed
+   * by the lower-cased tblSearch ColumnName: for rows whose own SQL cannot run.
+   */
+  printOverrides?: Record<string, string>;
+  /**
    * Lists the form opens with DisplayListForm outside any text box (menu pickers …). `params`
    * are the values the list depends on (the current row's Type for Word Master's Replace), as
    * the client sends them: always text, to be bound as parameters.
