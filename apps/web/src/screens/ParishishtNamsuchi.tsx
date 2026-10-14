@@ -14,6 +14,7 @@ import type { ScreenProps } from './registry';
  * column positions, widths and headers are the ones in frmParishistNamSuchi.Designer.vb.
  */
 function makeSpec(openPublication: () => void): ScreenSpec {
+  console.log('makeSpec: openPublication', openPublication);
   return {
     screen: 'parishisht-namsuchi',
     panelHeight: 56,
@@ -29,7 +30,7 @@ function makeSpec(openPublication: () => void): ScreenSpec {
         nameColumn: 'ParishistPublicationName',
       },
     ],
-    labels: [{ text: 'Publication', at: { x: 764, y: 13 }, onClick: openPublication }],
+    labels: [{ text: 'Publication', at: { x: 764, y: 13 } }],
     columns: [
       { header: 'ParishistNamSuchiKm', field: 'ParishistNamSuchiKm', width: 5 },
       { header: 'ParishistPublicationKt', field: 'ParishistPublicationKt', hidden: true },

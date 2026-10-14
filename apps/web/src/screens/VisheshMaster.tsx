@@ -52,7 +52,7 @@ const spec: ScreenSpec = {
       labelAt: { x: 513, y: 22 },
       at: { x: 629, y: 18, w: 360 },
     },
-    { name: 'remark', label: 'Remark', labelAt: { x: 513, y: 58 }, at: { x: 629, y: 54, w: 360 } },
+    { name: 'remark', label: 'Vibhag', labelAt: { x: 513, y: 58 }, at: { x: 629, y: 54, w: 360 } },
     {
       name: 'ShortNm',
       label: 'Short Name',
@@ -66,7 +66,7 @@ const spec: ScreenSpec = {
       at: { x: 629, y: 126, w: 360 },
       kt: true,
       nameColumn: 'UplevelName',
-      // Txt_KeyDown's txtuplevelkt branch: by the Remark box and the loaded record.
+      // Txt_KeyDown's txtuplevelkt branch: by the Vibhag box and the loaded record.
       f2Params: (ctx) => ({ remark: ctx.fields.remark ?? '', id: ctx.tranKm }),
     },
     {
@@ -110,7 +110,7 @@ const spec: ScreenSpec = {
   },
   columns: [
     { header: 'Id', field: 'Tid', width: 80 },
-    { header: 'Remark', field: 'remark', width: 130 },
+    { header: 'Vibhag', field: 'remark', width: 130 },
     { header: 'Name', field: 'Vishesh', width: 150 },
     { header: 'Brief', field: 'Brief' },
     { header: 'Short Name', field: 'ShortNm' },

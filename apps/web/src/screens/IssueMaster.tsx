@@ -79,7 +79,7 @@ const fields: FieldSpec[] = [
   }),
   {
     name: 'Adey',
-    at: { x: 311, y: 24, w: 69 },
+    at: { x: 311, y: 18, w: 69 },
     checkbox: 'Adey',
     // chkAdey_CheckedChanged, Add mode only: Due = Issue + 3, or + 90 unchecked.
     onUserChange: (v, ctx) => {
