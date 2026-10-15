@@ -1,6 +1,7 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import {
   answer,
+  chooseSearchBy,
   dialog,
   grid,
   login,
@@ -484,14 +485,14 @@ test('Lab Issue Master: Search In Range on RequestDate (dates only), not offered
 
   const searchMenu = () => page.getByRole('menu', { name: 'Search' });
   // UcSearch.cntMenu_Opening: no Search In Range for a text column.
-  await win.getByLabel('Search By').selectOption({ label: 'Type' });
+  await chooseSearchBy(win, 'Type');
   await win.getByLabel('Search', { exact: true }).click({ button: 'right' });
   await expect(searchMenu().getByRole('menuitem', { name: 'Search For Blank' })).toBeVisible();
   await expect(searchMenu().getByRole('menuitem', { name: 'Search In Range' })).toHaveCount(0);
   await page.keyboard.press('Escape');
 
   // A datetime column: the box offers last month to today, dd/MM/yyyy-dd/MM/yyyy.
-  await win.getByLabel('Search By').selectOption({ label: 'RequestDate' });
+  await chooseSearchBy(win, 'RequestDate');
   await win.getByLabel('Search', { exact: true }).click({ button: 'right' });
   await searchMenu().getByRole('menuitem', { name: 'Search In Range' }).click();
   const box = page.getByLabel(/Please Enter Range in dd\/MM\/yyyy Format/);
@@ -729,7 +730,7 @@ test('Issue Master: add a slip, continue adding, edit, Issue Slip print, Return 
   await expect(page.getByRole('grid')).not.toContainText('F004427');
 
   // Search By "Returned", F2: the form's own list, then the rows with that value.
-  await win.getByLabel('Search By').selectOption({ label: 'Returned' });
+  await chooseSearchBy(win, 'Returned');
   await win.getByLabel('Search', { exact: true }).press('F2');
   const values = page.getByRole('listbox', { name: 'List' });
   await expect(values.getByRole('option').nth(1)).toBeVisible();

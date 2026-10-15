@@ -525,3 +525,13 @@ split as if the dates themselves contained `-`, so every date range was refused 
 Enter Proper Value"; fixed. The item is now hidden for other column types, as on the desktop.
 Tests: `master-lab-issue.integration.test.ts` "searches a date column in a dd/MM/yyyy range",
 `e2e/batch-d.spec.ts` "Lab Issue Master: Search In Range on RequestDate …".
+
+### Search By box (2026-10-15)
+
+UcSearch's `cmbSearchBy` is an editable ComboBox (`DropDownStyle` DropDown, `AutoCompleteMode`
+SuggestAppend, `AutoCompleteSource` ListItems): typing lists the columns that start with the
+text and completes the first one; Up/Down, Alt+Down / F4 and F2 (the tblSearch list) also pick.
+The web had a plain `<select>`; it is now `components/ui/SuggestComboBox.tsx`, used by the
+shared SearchBar on every master screen. Text that matches no column clears the choice when the
+box is left (the desktop would fail on its next search instead). Test: `e2e/bhasha-master.spec.ts`
+"Search By is a SuggestAppend combo …"; other tests choose a column with `chooseSearchBy()`.

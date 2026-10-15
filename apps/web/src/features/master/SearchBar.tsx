@@ -6,6 +6,7 @@ import { ContextMenu, type ContextMenuItem } from '@/components/ui/ContextMenu';
 import { InputBox } from '@/components/ui/InputBox';
 import { useMessageBox } from '@/components/ui/MessageBox';
 import { PickListDialog } from '@/components/ui/PickListDialog';
+import { SuggestComboBox } from '@/components/ui/SuggestComboBox';
 import type { ScreenActions } from './types';
 import type { MasterState } from './useMasterScreen';
 
@@ -143,10 +144,17 @@ export function SearchBar({ state, actions }: { state: MasterState; actions?: Sc
           setMenuAt({ x: e.clientX, y: e.clientY });
         }}
       >
-        <select
-          aria-label="Search By"
+        <SuggestComboBox
+          label="Search By"
+          items={[
+            { value: '', label: '' },
+            ...(state.meta?.searchColumns ?? []).map((c) => ({
+              value: String(c.id),
+              label: c.displayName,
+            })),
+          ]}
           value={state.searchBy}
-          onChange={(e) => state.setSearchBy(e.target.value)}
+          onChange={state.setSearchBy}
           onKeyDown={(e) => {
             if (e.key !== 'F2') return;
             e.preventDefault();
@@ -158,16 +166,10 @@ export function SearchBar({ state, actions }: { state: MasterState; actions?: Sc
               },
             });
           }}
-          className="h-[29px] w-[151px] border border-[#7a7a7a] bg-white px-0.5 outline-none"
+          width={151}
+          height={29}
           style={{ fontFamily: 'var(--font-grid-header)', fontSize: 16 }}
-        >
-          <option value="" />
-          {(state.meta?.searchColumns ?? []).map((c) => (
-            <option key={c.id} value={String(c.id)}>
-              {c.displayName}
-            </option>
-          ))}
-        </select>
+        />
         <input
           ref={textRef}
           aria-label="Search"

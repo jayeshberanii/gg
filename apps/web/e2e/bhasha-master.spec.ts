@@ -1,5 +1,14 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
-import { answer, dialog, grid, login, openMenuItem, scenario, useScenario } from './helpers';
+import {
+  answer,
+  chooseSearchBy,
+  dialog,
+  grid,
+  login,
+  openMenuItem,
+  scenario,
+  useScenario,
+} from './helpers';
 
 /**
  * Master › Bhasha Master (frmBhashaMaster), the pilot screen for the generic master engine
@@ -255,7 +264,7 @@ test('the Search By F2 list picks several values: Ctrl-click, then Enter in the 
   page,
 }) => {
   const win = await openScreen(page);
-  await win.getByLabel('Search By').selectOption({ label: 'Name' });
+  await chooseSearchBy(win, 'Name');
   await win.getByLabel('Search', { exact: true }).press('F2');
   const list = page.getByRole('listbox', { name: 'Name' });
   await expect(list.getByRole('option').nth(3)).toBeVisible({ timeout: 30_000 });
@@ -359,7 +368,7 @@ test('the F2 list: click and drag selects the rows passed over, then Enter picks
   page,
 }) => {
   const win = await openScreen(page);
-  await win.getByLabel('Search By').selectOption({ label: 'Name' });
+  await chooseSearchBy(win, 'Name');
   await win.getByLabel('Search', { exact: true }).press('F2');
   const list = page.getByRole('listbox', { name: 'Name' });
   const options = list.getByRole('option');
@@ -395,4 +404,44 @@ test('the fields panel stretches sideways to fill a wide window', async ({ page 
   // Positions and widths scale together; the row stays where the designer put it.
   expect(atNarrow.x).toBeLessThan(atWide.x);
   expect(atNarrow.y).toBeCloseTo(atWide.y, 0);
+});
+
+test('Search By is a SuggestAppend combo: typing suggests and completes, arrows and Alt+Down pick', async ({
+  page,
+}) => {
+  const win = await openScreen(page);
+  const box = win.getByRole('combobox', { name: 'Search By', exact: true });
+  const list = page.getByRole('listbox', { name: 'Search By list' });
+
+  // Typing "na": every column that starts with it is listed, and the box completes the first.
+  await box.pressSequentially('na');
+  await expect(list).toBeVisible();
+  const names = await list.getByRole('option').allTextContents();
+  expect(names.length).toBeGreaterThan(0);
+  for (const n of names) expect(n.toLowerCase().startsWith('na')).toBe(true);
+  await expect(box).toHaveValue(`na${names[0]!.slice(2)}`);
+
+  // Down highlights the first suggestion and shows it; Enter takes it.
+  await box.press('ArrowDown');
+  await expect(list.getByRole('option').first()).toHaveAttribute('aria-selected', 'true');
+  await box.press('Enter');
+  await expect(list).toBeHidden();
+  await expect(box).toHaveValue(names[0]!);
+
+  // Alt+Down drops the whole list (with the blank first row); Esc closes it.
+  await box.press('Alt+ArrowDown');
+  await expect(list.getByRole('option')).toHaveCount(await list.getByRole('option').count());
+  expect(await list.getByRole('option').count()).toBeGreaterThan(names.length);
+  await box.press('Escape');
+  await expect(list).toBeHidden();
+
+  // Text that is no column clears the choice when the box is left.
+  await box.fill('zzqnothing');
+  await box.press('Tab');
+  await expect(box).toHaveValue('');
+
+  // With no list open, Down steps to the next column.
+  await box.focus();
+  await box.press('ArrowDown');
+  await expect(box).not.toHaveValue('');
 });

@@ -1,4 +1,4 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, type Locator, type Page, test } from '@playwright/test';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -81,4 +81,16 @@ export async function openMenuItem(page: Page, menu: string, item: string) {
     .getByRole('menu', { name: menu })
     .getByRole('menuitem', { name: item, exact: true })
     .click();
+}
+
+/**
+ * Types a column into UcSearch's "Search By" box (an editable SuggestAppend ComboBox), drops the
+ * auto-appended rest of a longer name, and takes it with Enter.
+ */
+export async function chooseSearchBy(win: Locator, column: string) {
+  const box = win.getByRole('combobox', { name: 'Search By', exact: true });
+  await box.fill(column);
+  await box.press('Delete');
+  await box.press('Enter');
+  await expect(box).toHaveValue(column);
 }
