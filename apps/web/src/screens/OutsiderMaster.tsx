@@ -135,7 +135,7 @@ const spec: ScreenSpec = {
     { header: 'Attendedbykt', field: 'attendedbykt', hidden: true },
     { header: 'Attended By', field: 'attendedbyName', width: 150 },
     { header: 'DemandApprovedBykt', field: 'DemandApprovedbykt', hidden: true, width: 20 },
-    { header: 'DemandApproved By', field: 'DemandApprovedbyName', width: 35 },
+    { header: 'DemandApproved By', field: 'DemandApprovedbyName', width: 150 },
     { header: 'WorkDoneBykt', field: 'WorkDonebykt', hidden: true },
     { header: 'Work DoneBy', field: 'WorkDonebyName' },
     { header: 'Status', field: 'StatusName' },

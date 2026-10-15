@@ -62,12 +62,12 @@ function buildSpec(openBookT: (ids: number[]) => void): ScreenSpec {
       box('endate', 'Request Date', C1, 98, { datetimeText: 'date' }),
       box('DeliveryDt', 'Deliver Date', C2, 98, { datetimeText: 'date' }),
       box('TransferDt', 'Transfer Date', C3, 98, { datetimeText: 'date' }),
-      {
-        name: 'CancelReq',
-        at: { x: 136, y: 142, w: 116 },
-        checkbox: 'Cancel Req',
-        alwaysDisabled: true,
-      },
+      // {
+      //   name: 'CancelReq',
+      //   at: { x: 136, y: 142, w: 116 },
+      //   checkbox: 'Cancel Req',
+      //   alwaysDisabled: true,
+      // },
       box('RetbackBykt', 'Return By', C2, 142, kt('RetbackByName')),
       box('RetbackDt', 'Return Date', C3, 142, { datetimeText: 'date' }),
     ],
@@ -93,6 +93,8 @@ function buildSpec(openBookT: (ids: number[]) => void): ScreenSpec {
       { header: 'Return Date', field: 'RetbackDt', width: 125, format: 'datetime' },
       { header: 'Transferuserkt', field: 'Transferuserkt', hidden: true },
       { header: 'Transfer To', field: 'TransferuserName', width: 120 },
+      // Web-only: the desktop grid ends at Transfer To (txtTransferDt is on the form only).
+      { header: 'Transfer Date', field: 'TransferDt', width: 125, format: 'datetime' },
     ],
     // dgMain_CellFormatting.
     rowTextColor: (row) => labIssueRowColor(row),

@@ -210,7 +210,9 @@ Designer columns (enum `GvMain`), FullRowSelect, ReadOnly:
 Notes on the tblSearch rows (TransactionName `LabIssueM`, all present in the DB):
 
 - `BookTKt` JoinCondition `CASE WHEN Type='Patrika' THEN (SELECT RecordNo FROM Patrika WHERE PatrikaKm=BooktKt) ELSE (SELECT Libno FROM BookT WHERE tid=BooktKt) END AS BookTName`.
-- `TransferDt` is DisplayInGrid but has no Designer column, so it is not shown.
+- `TransferDt` is DisplayInGrid but has no Designer column, so the desktop does not show it.
+  The web adds a **Transfer Date** column after Transfer To (width 125, `dd-MM-yyyy HH:mm:ss`
+  like the other dates); a web addition, not a desktop column.
 - `moduserKt`, `moddate` and `CancelReq` are searchable, not in the grid.
 
 **Row colours** (`dgMain_CellFormatting`, ForeColor). These are driven by the people columns,

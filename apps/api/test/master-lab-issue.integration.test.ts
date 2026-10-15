@@ -72,6 +72,7 @@ describe.skipIf(!hasDb)('Lab Issue Master via the master engine (integration)', 
       'RetbackByName',
       'RetbackDt',
       'TransferuserName',
+      'TransferDt',
     ])
       expect(rows[0]).toHaveProperty(c);
     expect(Number(rows[0]!.LabIssueMkm)).toBeGreaterThan(Number(rows.at(-1)!.LabIssueMkm));
