@@ -79,10 +79,14 @@ export function SearchBar({ state, actions }: { state: MasterState; actions?: Sc
         : 'Please Enter Range(Ex.:- 1-10)',
       value: isDate ? `${fmt(lastMonth)}-${fmt(today)}` : '',
       onOk: (value) => {
+        // UcSearch.SearchInRangeToolStripMenuItem_Click: an empty answer is a cancel; otherwise
+        // the text must split on '-' into exactly two parts ("1-10", "01/12/2015-31/12/2015").
+        if (value === '') {
+          setPrompt(null);
+          return;
+        }
         const parts = value.split('-');
-        const [from, to] = isDate
-          ? [parts.slice(0, 3).join('-'), parts.slice(3).join('-')]
-          : [parts[0] ?? '', parts[1] ?? ''];
+        const [from, to] = parts.length === 2 ? [parts[0]!.trim(), parts[1]!.trim()] : ['', ''];
         if (!from || !to) {
           void msg.alert(
             isDate
@@ -92,7 +96,7 @@ export function SearchBar({ state, actions }: { state: MasterState; actions?: Sc
           return;
         }
         setPrompt(null);
-        void state.searchRange(column!.id, from.trim(), to.trim());
+        void state.searchRange(column!.id, from, to);
       },
     });
   }
@@ -103,8 +107,12 @@ export function SearchBar({ state, actions }: { state: MasterState; actions?: Sc
     await state.searchBlank(column!.id, blank, withinGrid);
   }
 
+  // UcSearch.cntMenu_Opening: Search In Range only for an int, date or datetime column.
+  const rangeable = ['int', 'date', 'datetime'].includes(column?.dataType.toLowerCase() ?? '');
   const menuItems: ContextMenuItem[] = [
-    { kind: 'item', label: 'Search In Range', onSelect: () => void searchInRange() },
+    ...(rangeable
+      ? [{ kind: 'item', label: 'Search In Range', onSelect: () => void searchInRange() } as const]
+      : []),
     { kind: 'item', label: 'Search For Blank', onSelect: () => void searchBlank(true) },
     { kind: 'item', label: 'Search For Not In Blank', onSelect: () => void searchBlank(false) },
     {

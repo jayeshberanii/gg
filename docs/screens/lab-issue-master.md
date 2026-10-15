@@ -510,3 +510,18 @@ available on the web yet" window until Patrika is ported.
   for it (`save(…, { env })`).
 - Tests: `master-lab-issue.integration.test.ts` — "does not hold 30-day-old due books …" (off)
   and the second `describe`, run with the flag on.
+
+## Search In Range (2026-10-15)
+
+UcSearch's right-click **Search In Range** (`UcSearch.SearchInRangeToolStripMenuItem_Click`)
+searches between two values of the Search By column: `1-10` for an int column, or
+`dd/MM/yyyy-dd/MM/yyyy` for a date/datetime one (RequestDate, Deliver Date, Return Date,
+Transfer Date, moddate), offered as last month to today. The answer must split on `-` into
+exactly two parts; an empty answer is a cancel. `cntMenu_Opening` shows the item only for an
+`int` / `date` / `datetime` column.
+
+Web (shared `features/master/SearchBar.tsx`, so every master screen): the date range used to be
+split as if the dates themselves contained `-`, so every date range was refused with "Please
+Enter Proper Value"; fixed. The item is now hidden for other column types, as on the desktop.
+Tests: `master-lab-issue.integration.test.ts` "searches a date column in a dd/MM/yyyy range",
+`e2e/batch-d.spec.ts` "Lab Issue Master: Search In Range on RequestDate …".

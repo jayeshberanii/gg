@@ -71,13 +71,13 @@ const spec: ScreenSpec = {
   fields: [
     // Column 1
     box('LetterDate', 'Letter Date', C1, 18, 23, { date: true }),
-    box('ConcernedPersonKt', 'Concerned Person', C1, 54, 58, {
-      kt: true,
-      nameColumn: 'ConcernedPersonName',
-    }),
+    // box('ConcernedPersonKt', 'Concerned Person', C1, 54, 58, {
+    //   kt: true,
+    //   nameColumn: 'ConcernedPersonName',
+    // }),
     half('PartyName', 'Party Name', 165, 99),
     half('AuthorKt', 'Author', 265, 97, { kt: true, nameColumn: 'AuthorName' }),
-    box('PartyAddress', 'Party Address', C1, 126, 128),
+    // box('PartyAddress', 'Party Address', C1, 126, 128),
     box('BookTran', 'Book Detail', C1, 162, 163, { trans: 'BookTran' }),
     {
       name: 'Letter',
@@ -88,20 +88,20 @@ const spec: ScreenSpec = {
     },
     // Column 2
     box('LetterNo', 'Letter No', C2, 18, 23, { noF2: true }),
-    box('LetterTypekt', 'Letter Type', C2, 54, 58, { kt: true, nameColumn: 'LetterTypeName' }),
+    // box('LetterTypekt', 'Letter Type', C2, 54, 58, { kt: true, nameColumn: 'LetterTypeName' }),
     half('Vishay', 'Vishay', 517, 81),
     half('PrakashakKt', 'Prakashak', 599, 79, { kt: true, nameColumn: 'PrakashakName' }),
-    box('PagesAttached', 'Page Attached', C2, 126, 128, { noF2: true }),
-    box('FollowUpRem', 'FollowUp Remark', C2, 162, 163),
+    // box('PagesAttached', 'Page Attached', C2, 126, 128, { noF2: true }),
+    // box('FollowUpRem', 'FollowUp Remark', C2, 162, 163),
     // Column 3
-    box('NextReminderDt', 'NextReminder Date', C3, 18, 23, { date: true }),
+    // box('NextReminderDt', 'NextReminder Date', C3, 18, 23, { date: true }),
     box('StatusTypekt', 'Status Type', C3, 54, 58, { kt: true, nameColumn: 'StatusTypeName' }),
     box('StatusRemark', 'Status Remark', C3, 90, 93),
-    box('WorkGivenMkt', 'WorkGivenMkt', C3, 126, 128, {
-      kt: true,
-      nameColumn: 'WorkGivenMName',
-      f2SearchText: true,
-    }),
+    // box('WorkGivenMkt', 'WorkGivenMkt', C3, 126, 128, {
+    //   kt: true,
+    //   nameColumn: 'WorkGivenMName',
+    //   f2SearchText: true,
+    // }),
     box('MagazineKt', 'Magazine', C3, 162, 163, { kt: true, nameColumn: 'MagazineName' }),
   ],
   labels: [

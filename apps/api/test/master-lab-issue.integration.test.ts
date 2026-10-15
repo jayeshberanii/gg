@@ -350,6 +350,28 @@ describe.skipIf(!hasDb)('Lab Issue Master via the master engine (integration)', 
     expect((await row(p.id)).BookTKt).toBe(p.BookTKt);
   });
 
+  it('searches a date column in a dd/MM/yyyy range (UcSearch Search In Range)', async () => {
+    const { tids } = await freeCopies();
+    const id = Number((await add(h.user, tids[0]!)).body.id);
+    await sql`UPDATE LabIssueM SET endate = '2001-02-03T10:20:00' WHERE LabIssueMkm = ${id}`.execute(
+      h.trx,
+    );
+    const meta = (await h.user.get(`${API}/meta`)).body as {
+      searchColumns: { id: number; columnName: string }[];
+    };
+    const endate = meta.searchColumns.find((c) => c.columnName === 'endate')!;
+    const range = (from: string, to: string) =>
+      h.user.post(`${API}/search-range`).send({ columnId: endate.id, from, to });
+
+    const hit = (await range('01/02/2001', '28/02/2001')).body as GridRow[];
+    expect(hit.map((r) => Number(r.LabIssueMkm))).toContain(id);
+    const miss = (await range('04/02/2001', '28/02/2001')).body as GridRow[];
+    expect(miss.map((r) => Number(r.LabIssueMkm))).not.toContain(id);
+    expect((await range('2001-02-01', '28/02/2001')).body.message).toBe(
+      'Please Enter Proper Value in dd/MM/yyyy Format(Ex.:- (01/12/2015-31/12/2015)',
+    );
+  });
+
   it('deletes an undelivered request with the Security password', async () => {
     const { tids } = await freeCopies();
     const id = (await add(h.user, tids[0]!)).body.id as number;

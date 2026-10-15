@@ -472,6 +472,43 @@ async function addPatrika(page: Page, win: Locator) {
   return recordNo;
 }
 
+test('Lab Issue Master: Search In Range on RequestDate (dates only), not offered for a text column', async ({
+  page,
+}) => {
+  test.setTimeout(240_000);
+  await login(page, scenario.users.reporter);
+  await openMenuItem(page, 'Issue', 'Lab Issue Master');
+  const win = page.getByRole('region', { name: 'Lab Issue Master' });
+  const g = grid(page);
+  const libNo = await addLabRequest(page, win);
+
+  const searchMenu = () => page.getByRole('menu', { name: 'Search' });
+  // UcSearch.cntMenu_Opening: no Search In Range for a text column.
+  await win.getByLabel('Search By').selectOption({ label: 'Type' });
+  await win.getByLabel('Search', { exact: true }).click({ button: 'right' });
+  await expect(searchMenu().getByRole('menuitem', { name: 'Search For Blank' })).toBeVisible();
+  await expect(searchMenu().getByRole('menuitem', { name: 'Search In Range' })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+
+  // A datetime column: the box offers last month to today, dd/MM/yyyy-dd/MM/yyyy.
+  await win.getByLabel('Search By').selectOption({ label: 'RequestDate' });
+  await win.getByLabel('Search', { exact: true }).click({ button: 'right' });
+  await searchMenu().getByRole('menuitem', { name: 'Search In Range' }).click();
+  const box = page.getByLabel(/Please Enter Range in dd\/MM\/yyyy Format/);
+  await expect(box).toHaveValue(/^\d{2}\/\d{2}\/\d{4}-\d{2}\/\d{2}\/\d{4}$/);
+  await box.press('Enter');
+  await expect(g.cell(0, 'BookTName')).toHaveText(libNo);
+
+  // A range before today: the new request is not in it.
+  await win.getByLabel('Search', { exact: true }).click({ button: 'right' });
+  await searchMenu().getByRole('menuitem', { name: 'Search In Range' }).click();
+  await box.fill('01/01/2001-31/12/2001');
+  await box.press('Enter');
+  await expect(
+    page.getByRole('grid').getByRole('gridcell', { name: libNo, exact: true }),
+  ).toHaveCount(0);
+});
+
 test('Patrika: New by series, popups, edit, Graphics Detail, Show Attachments, delete', async ({
   page,
 }) => {
